@@ -14,6 +14,14 @@ const browserDistFolder = resolve(serverDistFolder, '../browser');
 const app = express();
 const angularApp = new AngularNodeAppEngine();
 
+app.use(express.json());
+
+app.post('/api/start-call', async (req, res) => {
+  console.log('Received call start request');
+  // TODO: integrate AI voice service and OpenAI API
+  res.json({ message: 'Call started' });
+});
+
 /**
  * Example Express Rest API endpoints can be defined here.
  * Uncomment and define endpoints as necessary.

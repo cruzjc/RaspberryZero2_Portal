@@ -9,6 +9,7 @@ import OpenAI from 'openai';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+
 const serverDistFolder = dirname(fileURLToPath(import.meta.url));
 const browserDistFolder = resolve(serverDistFolder, '../browser');
 
@@ -18,26 +19,53 @@ const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] });
 
 app.use(express.json());
 
-app.post('/api/start-call', async (req, res) => {
-  console.log('Received call start request');
-  try {
-    const chatCompletion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [
-        {
-          role: 'user',
-          content: 'Start an AI voice call greeting.',
-        },
-      ],
-    });
+// app.post('/api/start-call', async (req, res) => {
+//   console.log('Received call start request');
+//   try {
 
-    const content = chatCompletion.choices[0]?.message?.content?.trim();
-    res.json({ message: content ?? 'Call started' });
-  } catch (err) {
-    console.error('Failed to contact OpenAI API', err);
-    res.status(500).json({ message: 'Failed to start call' });
-  }
+//     const session = await openai.realtime.sessions.create({
+//       model: 'gpt-4o-realtime-preview-2025-06-03',
+//     });
+
+//     const chatCompletion = await openai.chat.completions.create({
+//       model: 'gpt-3.5-turbo',
+//       messages: [
+//         {
+//           role: 'user',
+//           content: 'Start an AI voice call greeting.',
+//         },
+//       ],
+//     });
+
+//     const content = chatCompletion.choices[0]?.message?.content?.trim();
+//     res.json({ message: content ?? 'Call started' });
+//   } catch (err) {
+//     console.error('Failed to contact OpenAI API', err);
+//     res.status(500).json({ message: 'Failed to start call' });
+//   }
+// });
+
+// create an ephemeral token
+
+
+app.get("/session", async (req, res) => {
+  const r = await fetch("https://api.openai.com/v1/realtime/sessions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env['OPENAI_API_KEY']}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini-realtime-preview-2024-12-17",
+      voice: "shimmer",
+    }),
+  });
+  const data = await r.json();
+
+  // Send back the JSON we received from the OpenAI REST API
+  res.send(data);
 });
+
 
 /**
  * Example Express Rest API endpoints can be defined here.

@@ -5,6 +5,7 @@ import {
   writeResponseToNodeResponse,
 } from '@angular/ssr/node';
 import express from 'express';
+import OpenAI from 'openai';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,13 +14,29 @@ const browserDistFolder = resolve(serverDistFolder, '../browser');
 
 const app = express();
 const angularApp = new AngularNodeAppEngine();
+const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] });
 
 app.use(express.json());
 
 app.post('/api/start-call', async (req, res) => {
   console.log('Received call start request');
-  // TODO: integrate AI voice service and OpenAI API
-  res.json({ message: 'Call started' });
+  try {
+    const chatCompletion = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        {
+          role: 'user',
+          content: 'Start an AI voice call greeting.',
+        },
+      ],
+    });
+
+    const content = chatCompletion.choices[0]?.message?.content?.trim();
+    res.json({ message: content ?? 'Call started' });
+  } catch (err) {
+    console.error('Failed to contact OpenAI API', err);
+    res.status(500).json({ message: 'Failed to start call' });
+  }
 });
 
 /**

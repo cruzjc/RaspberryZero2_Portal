@@ -49,6 +49,7 @@ app.use(express.json());
 
 
 app.get("/session", async (req, res) => {
+  console.log('Received session request process.env.OPENAI_API_KEY', process.env['OPENAI_API_KEY']);
   const r = await fetch("https://api.openai.com/v1/realtime/sessions", {
     method: "POST",
     headers: {
@@ -62,6 +63,7 @@ app.get("/session", async (req, res) => {
   });
   const data = await r.json();
 
+  console.log('Received session response', data);
   // Send back the JSON we received from the OpenAI REST API
   res.send(data);
 });

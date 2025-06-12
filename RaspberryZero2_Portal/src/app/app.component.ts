@@ -10,7 +10,11 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 })
 export class AppComponent {
   title = 'RaspberryZero2_Portal';
-  constructor(private http: HttpClient) {}
+  currentDate = new Date();
+
+  constructor(private http: HttpClient) {
+    setInterval(() => (this.currentDate = new Date()), 1000);
+  }
 
   async startCall(): Promise<void> {
     let tokenResponse;

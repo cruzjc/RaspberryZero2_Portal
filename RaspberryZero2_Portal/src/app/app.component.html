@@ -1,3 +1,45 @@
 
-<button class="call-button" (click)="startCall()">Start AI Call</button>
-<router-outlet />
+<div class="dashboard">
+  <header>
+    <h1>Dashboard</h1>
+    <button class="call-button" (click)="startCall()">Start AI Call</button>
+  </header>
+  <main class="widgets">
+    <section class="widget news">
+      <h2>AI News Summary</h2>
+      <p>Coming soon...</p>
+    </section>
+    <section class="widget calendar">
+      <h2>Calendar</h2>
+      <p>Google Calendar integration placeholder</p>
+    </section>
+    <section class="widget datetime">
+      <h2>Date &amp; Time</h2>
+      <p>{{ currentDate | date:'fullDate' }} {{ currentDate | date:'shortTime' }}</p>
+    </section>
+    <section class="widget agent-status">
+      <h2>AI Agent Status</h2>
+      <p>Status information will appear here</p>
+    </section>
+    <section class="widget agent-history">
+      <h2>AI Agent History</h2>
+      <p>Recent interactions will be listed here</p>
+    </section>
+    <section class="widget system-events">
+      <h2>System Events</h2>
+      <p>Logs will show up here</p>
+    </section>
+    <section class="widget links">
+      <h2>Shortcuts</h2>
+      <ul>
+        <li><a href="#">Link 1</a></li>
+        <li><a href="#">Link 2</a></li>
+      </ul>
+    </section>
+    <section class="widget wallpaper">
+      <h2>Wallpaper</h2>
+      <p>Wallpaper controls go here</p>
+    </section>
+  </main>
+  <router-outlet />
+</div>

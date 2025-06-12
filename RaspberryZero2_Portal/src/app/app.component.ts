@@ -2,10 +2,11 @@ import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { DatePipe } from '@angular/common';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, HttpClientModule],
+  imports: [RouterOutlet, HttpClientModule, DatePipe],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'
 })

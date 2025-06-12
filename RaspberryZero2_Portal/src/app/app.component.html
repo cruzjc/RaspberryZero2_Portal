@@ -3,7 +3,7 @@
   <header>
     <h1>Dashboard</h1>
 <div>Session State: {{ sessionActive ? 'Active' : 'Inactive' }}</div>
-<div *ngIf="sessionActive">Session ID: {{ sessionId }}</div>
+<div @if(sessionActive)>Session ID: {{ sessionId }}</div>
 
 <button class="call-button" (click)="startCall()" [disabled]="sessionActive">
   Start AI Call
@@ -12,7 +12,7 @@
   End AI Call
 </button>
 
-<div *ngIf="transcript.length">
+<div @if(transcript.length)>
   <h3>Transcript</h3>
   <pre>{{ transcript.join('\n') }}</pre>
 </div>

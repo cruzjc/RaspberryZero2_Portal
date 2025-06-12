@@ -11,13 +11,20 @@ import { firstValueFrom } from 'rxjs';
 })
 export class AppComponent {
   title = 'RaspberryZero2_Portal';
+  currentDate = new Date();
+
+  
   sessionActive = false;
   sessionId = '';
   transcript: string[] = [];
   private pc?: RTCPeerConnection;
   private ephemeralKey = '';
+  
+  
+  constructor(private http: HttpClient) {
+    setInterval(() => (this.currentDate = new Date()), 1000);
+  }
 
-  constructor(private http: HttpClient) {}
 
   async startCall(): Promise<void> {
     try {

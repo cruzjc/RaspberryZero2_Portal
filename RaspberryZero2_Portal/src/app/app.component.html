@@ -1,38 +1,41 @@
 <div class="dashboard">
   <header>
-    <h1>Dashboard</h1>
-    <div>Session State: {{ sessionActive ? "Active" : "Inactive" }}</div>
-    <div *ngIf="sessionActive">Session ID: {{ sessionId }}</div>
+    <div class="header-info">
+      <h1>Dashboard</h1>
+      <div>Session State: {{ sessionActive ? "Active" : "Inactive" }}</div>
+      <div *ngIf="sessionActive">Session ID: {{ sessionId }}</div>
 
-    <button
-      class="call-button"
-      (click)="startCall()"
-      [disabled]="sessionActive"
-    >
-      Start AI Call
-    </button>
-    <button class="call-button" (click)="endCall()" [disabled]="!sessionActive">
-      End AI Call
-    </button>
-    <button
-      class="call-button"
-      (click)="updatePortal()"
-      [disabled]="sessionActive"
-    >
-      Update Portal
-    </button>
-    <button
-      class="call-button"
-      (click)="deployPortal()"
-      [disabled]="sessionActive"
-    >
-      Deploy Portal
-    </button>
-
-    <div *ngIf="transcript.length">
-      <h3>Transcript</h3>
-      <pre>{{ transcript.join("\n") }}</pre>
+      <div *ngIf="transcript.length">
+        <h3>Transcript</h3>
+        <pre>{{ transcript.join("\n") }}</pre>
+      </div>
     </div>
+    <aside class="call-sidebar">
+      <button
+        class="call-button"
+        (click)="startCall()"
+        [disabled]="sessionActive"
+      >
+        Start AI Call
+      </button>
+      <button class="call-button" (click)="endCall()" [disabled]="!sessionActive">
+        End AI Call
+      </button>
+      <button
+        class="call-button"
+        (click)="updatePortal()"
+        [disabled]="sessionActive"
+      >
+        Update Portal
+      </button>
+      <button
+        class="call-button"
+        (click)="deployPortal()"
+        [disabled]="sessionActive"
+      >
+        Deploy Portal
+      </button>
+    </aside>
   </header>
   <main class="widgets">
     <section class="widget news">

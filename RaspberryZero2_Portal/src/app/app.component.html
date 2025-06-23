@@ -73,6 +73,18 @@
       <h2>Wallpaper</h2>
       <p>Wallpaper controls go here</p>
     </section>
+    <section class="widget resources">
+      <h2>
+        Resources
+        <button class="call-button" (click)="addResource()">Add</button>
+      </h2>
+      <ul>
+        <li *ngFor="let r of resources">
+          <span>{{ r.content }}</span>
+          <button class="call-button" (click)="deleteResource(r)">Delete</button>
+        </li>
+      </ul>
+    </section>
   </main>
 </div>
 

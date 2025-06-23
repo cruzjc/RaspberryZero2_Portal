@@ -27,3 +27,21 @@ header {
   font-size: 1rem;
   padding: 0.5rem 1rem;
 }
+
+.resources h2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.resources ul {
+  list-style: none;
+  padding: 0;
+}
+
+.resources li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0.25rem 0;
+}

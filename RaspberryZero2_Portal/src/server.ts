@@ -8,7 +8,7 @@ import express from 'express';
 import OpenAI from 'openai';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { execSync } from 'child_process';
 import os from 'os';
 
@@ -18,6 +18,20 @@ const browserDistFolder = resolve(serverDistFolder, '../browser');
 const app = express();
 const angularApp = new AngularNodeAppEngine();
 const openai = new OpenAI({ apiKey: process.env['OPENAI_API_KEY'] });
+
+const resourcesFile = join(serverDistFolder, 'resources.json');
+
+function readResources(): any[] {
+  try {
+    return JSON.parse(readFileSync(resourcesFile, 'utf8')) as any[];
+  } catch {
+    return [];
+  }
+}
+
+function writeResources(data: any[]) {
+  writeFileSync(resourcesFile, JSON.stringify(data, null, 2));
+}
 
 app.use(express.json());
 
@@ -105,6 +119,34 @@ app.post('/api/deploy', (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Failed to deploy' });
   }
+});
+
+app.get('/api/resources', (req, res) => {
+  const resources = readResources().sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+  res.json(resources);
+});
+
+app.post('/api/resources', (req, res) => {
+  const resources = readResources();
+  const entry = {
+    id: Date.now().toString(),
+    content: req.body.content,
+    createdAt: new Date().toISOString(),
+  };
+  resources.unshift(entry);
+  writeResources(resources);
+  res.json(entry);
+});
+
+app.delete('/api/resources/:id', (req, res) => {
+  let resources = readResources();
+  const id = req.params['id'];
+  const beforeLength = resources.length;
+  resources = resources.filter((r) => r.id !== id);
+  writeResources(resources);
+  res.json({ success: resources.length !== beforeLength });
 });
 
 /**

@@ -1,8 +1,14 @@
-import { Component, Inject, PLATFORM_ID } from '@angular/core';
+import { Component, Inject, PLATFORM_ID, OnInit } from '@angular/core';
 import { CommonModule, DatePipe, isPlatformBrowser } from '@angular/common';
 import { RouterOutlet } from '@angular/router';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+
+interface Resource {
+  id: string;
+  content: string;
+  createdAt: string;
+}
 
 @Component({
   selector: 'app-root',
@@ -11,7 +17,8 @@ import { firstValueFrom } from 'rxjs';
   templateUrl: './app.component.html',
   styleUrl: './app.component.css',
 })
-export class AppComponent {
+
+export class AppComponent implements OnInit {
   title = 'RaspberryZero2_Portal';
   currentDate = new Date();
 
@@ -20,6 +27,8 @@ export class AppComponent {
   transcript: string[] = [];
   private pc?: RTCPeerConnection;
   private ephemeralKey = '';
+
+  resources: Resource[] = [];
 
   private isBrowser: boolean;
 
@@ -31,6 +40,47 @@ export class AppComponent {
 
     if (this.isBrowser) {
       setInterval(() => (this.currentDate = new Date()), 1000);
+    }
+  }
+
+  ngOnInit(): void {
+    if (this.isBrowser) {
+      this.loadResources();
+    }
+  }
+
+  private async loadResources(): Promise<void> {
+    try {
+      this.resources = await firstValueFrom(
+        this.http.get<Resource[]>('/api/resources'),
+      );
+    } catch (err) {
+      console.error('Error loading resources', err);
+    }
+  }
+
+  async addResource(): Promise<void> {
+    if (!this.isBrowser) return;
+    const content = prompt('Enter text or URL');
+    if (!content) return;
+    try {
+      const res = await firstValueFrom(
+        this.http.post<Resource>('/api/resources', { content }),
+      );
+      this.resources = [res, ...this.resources];
+    } catch (err) {
+      console.error('Error adding resource', err);
+    }
+  }
+
+  async deleteResource(r: Resource): Promise<void> {
+    if (!this.isBrowser) return;
+    if (!confirm('Delete this entry?')) return;
+    try {
+      await firstValueFrom(this.http.delete(`/api/resources/${r.id}`));
+      this.resources = this.resources.filter((x) => x.id !== r.id);
+    } catch (err) {
+      console.error('Error deleting resource', err);
     }
   }
 

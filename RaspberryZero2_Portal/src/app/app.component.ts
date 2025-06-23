@@ -9,39 +9,38 @@ import { firstValueFrom } from 'rxjs';
   standalone: true,
   imports: [CommonModule, RouterOutlet, HttpClientModule, DatePipe],
   templateUrl: './app.component.html',
-  styleUrl: './app.component.css'
+  styleUrl: './app.component.css',
 })
 export class AppComponent {
   title = 'RaspberryZero2_Portal';
   currentDate = new Date();
 
-  
   sessionActive = false;
   sessionId = '';
   transcript: string[] = [];
   private pc?: RTCPeerConnection;
   private ephemeralKey = '';
-  
-  
+
   private isBrowser: boolean;
 
   constructor(
     private http: HttpClient,
-    @Inject(PLATFORM_ID) platformId: Object
+    @Inject(PLATFORM_ID) platformId: Object,
   ) {
     this.isBrowser = isPlatformBrowser(platformId);
-    
+
     if (this.isBrowser) {
       setInterval(() => (this.currentDate = new Date()), 1000);
     }
   }
 
-
   async startCall(): Promise<void> {
     if (!this.isBrowser) return;
-    
+
     try {
-      const tokenResponse = await firstValueFrom(this.http.get<any>('/session'));
+      const tokenResponse = await firstValueFrom(
+        this.http.get<any>('/session'),
+      );
       this.ephemeralKey = tokenResponse.client_secret.value;
       this.sessionId = tokenResponse.id;
     } catch (err) {
@@ -57,19 +56,19 @@ export class AppComponent {
       this.pc = new RTCPeerConnection();
 
       // Set up to play remote audio from the model
-      const audioEl = document.createElement("audio");
+      const audioEl = document.createElement('audio');
       audioEl.autoplay = true;
-      this.pc.ontrack = e => audioEl.srcObject = e.streams[0];
+      this.pc.ontrack = (e) => (audioEl.srcObject = e.streams[0]);
 
       // Add local audio track for microphone input in the browser
       const ms = await navigator.mediaDevices.getUserMedia({
-        audio: true
+        audio: true,
       });
       this.pc.addTrack(ms.getTracks()[0]);
 
       // Set up data channel for sending and receiving events
-      const dc = this.pc.createDataChannel("oai-events");
-      dc.addEventListener("message", (e) => {
+      const dc = this.pc.createDataChannel('oai-events');
+      dc.addEventListener('message', (e) => {
         try {
           const msg = JSON.parse(e.data);
           if (msg.delta) {
@@ -86,19 +85,19 @@ export class AppComponent {
       const offer = await this.pc.createOffer();
       await this.pc.setLocalDescription(offer);
 
-      const baseUrl = "https://api.openai.com/v1/realtime";
-      const model = "gpt-4o-mini-realtime-preview-2024-12-17";
+      const baseUrl = 'https://api.openai.com/v1/realtime';
+      const model = 'gpt-4o-mini-realtime-preview-2024-12-17';
       const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
-        method: "POST",
+        method: 'POST',
         body: offer.sdp,
         headers: {
           Authorization: `Bearer ${this.ephemeralKey}`,
-          "Content-Type": "application/sdp"
+          'Content-Type': 'application/sdp',
         },
       });
 
       const answer = new RTCSessionDescription({
-        type: "answer",
+        type: 'answer',
         sdp: await sdpResponse.text(),
       });
       await this.pc.setRemoteDescription(answer);
@@ -112,5 +111,23 @@ export class AppComponent {
     this.pc?.close();
     this.pc = undefined;
     this.sessionActive = false;
+  }
+
+  async updatePortal(): Promise<void> {
+    if (!this.isBrowser) return;
+    try {
+      await firstValueFrom(this.http.post('/api/update-repo', {}));
+    } catch (err) {
+      console.error('Error updating portal', err);
+    }
+  }
+
+  async deployPortal(): Promise<void> {
+    if (!this.isBrowser) return;
+    try {
+      await firstValueFrom(this.http.post('/api/deploy', {}));
+    } catch (err) {
+      console.error('Error deploying portal', err);
+    }
   }
 }

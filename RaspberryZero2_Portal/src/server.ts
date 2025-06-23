@@ -6,9 +6,11 @@ import {
 } from '@angular/ssr/node';
 import express from 'express';
 import OpenAI from 'openai';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
+import { existsSync } from 'fs';
+import { execSync } from 'child_process';
+import os from 'os';
 
 const serverDistFolder = dirname(fileURLToPath(import.meta.url));
 const browserDistFolder = resolve(serverDistFolder, '../browser');
@@ -47,18 +49,20 @@ app.use(express.json());
 
 // create an ephemeral token
 
-
-app.get("/session", async (req, res) => {
-  console.log('Received session request process.env.OPENAI_API_KEY', process.env['OPENAI_API_KEY']);
-  const r = await fetch("https://api.openai.com/v1/realtime/sessions", {
-    method: "POST",
+app.get('/session', async (req, res) => {
+  console.log(
+    'Received session request process.env.OPENAI_API_KEY',
+    process.env['OPENAI_API_KEY'],
+  );
+  const r = await fetch('https://api.openai.com/v1/realtime/sessions', {
+    method: 'POST',
     headers: {
-      "Authorization": `Bearer ${process.env['OPENAI_API_KEY']}`,
-      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env['OPENAI_API_KEY']}`,
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini-realtime-preview-2024-12-17",
-      voice: "shimmer",
+      model: 'gpt-4o-mini-realtime-preview-2024-12-17',
+      voice: 'shimmer',
     }),
   });
   const data = await r.json();
@@ -68,6 +72,40 @@ app.get("/session", async (req, res) => {
   res.send(data);
 });
 
+app.post('/api/update-repo', (req, res) => {
+  const home = os.homedir();
+  const repoUrl = 'https://github.com/yourusername/RaspberryZero2_Portal.git';
+  const repoPath = join(home, 'RaspberryZero2_Portal');
+  try {
+    if (!existsSync(repoPath)) {
+      execSync(`git clone ${repoUrl} ${repoPath}`);
+    } else {
+      execSync(`git -C ${repoPath} pull`, { stdio: 'inherit' });
+    }
+    const branch = `update-${Date.now()}`;
+    execSync(`git -C ${repoPath} checkout -b ${branch}`);
+    execSync(`git -C ${repoPath} add .`);
+    execSync(`git -C ${repoPath} commit -m "Automated update"`);
+    res.json({ message: 'Repository updated', branch });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update repository' });
+  }
+});
+
+app.post('/api/deploy', (req, res) => {
+  const home = os.homedir();
+  const repoPath = join(home, 'RaspberryZero2_Portal');
+  try {
+    execSync('npm run build', { cwd: repoPath, stdio: 'inherit' });
+    const distPath = join(repoPath, 'dist', 'raspberry-zero2-portal');
+    execSync(`cp -r ${distPath}/* ${home}/`);
+    res.json({ message: 'Deployment complete' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to deploy' });
+  }
+});
 
 /**
  * Example Express Rest API endpoints can be defined here.

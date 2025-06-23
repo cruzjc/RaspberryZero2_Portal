@@ -8,7 +8,18 @@
 header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+}
+
+.header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.call-sidebar {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .widgets {
@@ -26,4 +37,27 @@ header {
 .call-button {
   font-size: 1rem;
   padding: 0.5rem 1rem;
+}
+
+@media (max-width: 600px) {
+  .call-sidebar {
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    right: 0;
+    background: #fff;
+    padding: 0.5rem;
+    border-left: 1px solid #ccc;
+    box-shadow: -2px 0 4px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+  }
+
+  .call-sidebar .call-button {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .call-sidebar .call-button:last-child {
+    margin-bottom: 0;
+  }
 }

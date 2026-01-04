@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.angular/
+.portal-config.json
+.portal-resources.json
+*.log
+.DS_Store

@@ -1,0 +1,109 @@
+<div class="dashboard-container" *ngIf="isDashboard">
+  <header class="app-header glass-panel">
+    <div class="header-content">
+      <div class="brand">
+        <h1>Raspberry<span class="gradient-text">Zero2</span></h1>
+        <div class="status-badges">
+          <span class="badge" [class.active]="sessionActive">
+            <span class="dot"></span> {{ sessionActive ? "Call Active" : "Ready" }}
+          </span>
+          <span *ngIf="sessionActive" class="session-id">{{ sessionId }}</span>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <a routerLink="/settings" class="glass-button icon-btn" title="Settings">⚙️</a>
+        <button class="action-btn primary" (click)="startCall()" [disabled]="sessionActive">
+          📞 Start Call
+        </button>
+        <button class="action-btn danger" (click)="endCall()" [disabled]="!sessionActive">
+          Hang Up
+        </button>
+      </div>
+    </div>
+
+    <!-- Collapsible/Expandable transcript or extra controls could go here -->
+    <div *ngIf="transcript.length" class="transcript-box">
+      <h3>Live Transcript</h3>
+      <div class="transcript-content">
+        <p *ngFor="let line of transcript">{{ line }}</p>
+      </div>
+    </div>
+  </header>
+
+  <nav class="mobile-actions glass-panel">
+    <button class="glass-button" (click)="updatePortal()">📥 Update</button>
+    <button class="glass-button" (click)="deployPortal()">🚀 Deploy</button>
+  </nav>
+
+  <main class="widgets-grid">
+    <!-- News Widget (Self-Contained Style) -->
+    <app-news-widget class="span-2-col"></app-news-widget>
+
+    <section class="widget glass-panel datetime">
+      <h2>Date & Time</h2>
+      <div class="time-display">{{ currentDate | date: "shortTime" }}</div>
+      <div class="date-display">{{ currentDate | date: "fullDate" }}</div>
+    </section>
+
+    <section class="widget glass-panel system-events">
+      <h2>🖥️ System Status</h2>
+      <div class="system-stats">
+        <div class="stat-item">
+          <span class="label">CPU</span>
+          <div class="bar-container">
+            <div class="bar" style="width: 45%"></div>
+          </div>
+        </div>
+        <div class="stat-item">
+          <span class="label">RAM</span>
+          <div class="bar-container">
+            <div class="bar" style="width: 60%"></div>
+          </div>
+        </div>
+        <div class="stat-item">
+          <span class="label">Temp</span>
+          <span class="value">42°C</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="widget glass-panel calendar">
+      <h2>📅 Calendar</h2>
+      <div class="empty-state">No upcoming events</div>
+    </section>
+
+    <section class="widget glass-panel resources">
+      <div class="widget-header">
+        <h2>📝 Notes</h2>
+        <button class="glass-button sm" (click)="addResource()">+</button>
+      </div>
+      <ul class="resource-list">
+        <li *ngFor="let r of resources">
+          <span>{{ r.content }}</span>
+          <button class="delete-btn" (click)="deleteResource(r)">×</button>
+        </li>
+      </ul>
+    </section>
+
+    <section class="widget glass-panel links">
+      <h2>🔗 Shortcuts</h2>
+      <div class="shortcut-grid">
+        <a href="https://github.com/cruzjc" target="_blank" class="shortcut-item">
+          <span class="icon">🐙</span> GitHub
+        </a>
+        <a href="https://cruzjc.github.io/" target="_blank" class="shortcut-item">
+          <span class="icon">🌐</span> Website
+        </a>
+        <a href="https://chatgpt.com/codex" target="_blank" class="shortcut-item">
+          <span class="icon">🤖</span> ChatGPT
+        </a>
+        <a href="https://app.netlify.com/teams/cruzjc/projects" target="_blank" class="shortcut-item">
+          <span class="icon">☁️</span> Netlify
+        </a>
+      </div>
+    </section>
+  </main>
+</div>
+
+<router-outlet />

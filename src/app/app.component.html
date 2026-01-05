@@ -80,11 +80,6 @@
         <div class="section-title">-- SYSTEM_CONFIG --</div>
 
         <div class="config-group">
-          <h3>// NEWS_SOURCES</h3>
-          <app-news-settings></app-news-settings>
-        </div>
-
-        <div class="config-group">
           <h3>// ADMIN_CONTROLS</h3>
           <app-admin-settings></app-admin-settings>
         </div>
@@ -93,6 +88,18 @@
           <button class="term-btn" (click)="updatePortal()">[ SYS_UPDATE ]</button>
           <button class="term-btn" (click)="deployPortal()">[ RE-DEPLOY ]</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Feature Descriptions -->
+    <div class="feature-info">
+      <div class="info-line">
+        <span class="info-label">[ESTABLISH_LINK]</span>
+        <span class="info-desc">Voice chatbot powered by ElevenLabs API. Contact point for AI agent delegation.</span>
+      </div>
+      <div class="info-line">
+        <span class="info-label">[AI BRIEFING]</span>
+        <span class="info-desc">News summarization via Gemini (gemini-2.0-flash). TTS narration via Inworld API.</span>
       </div>
     </div>
   </main>

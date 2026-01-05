@@ -2,43 +2,56 @@
 import { Component, OnInit, ViewChild, ElementRef, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { RouterModule } from '@angular/router';
 
 @Component({
-    selector: 'app-news-widget',
-    standalone: true,
-    imports: [CommonModule, RouterModule],
-    template: `
-    <section class="widget news glass-panel">
+  selector: 'app-news-widget',
+  standalone: true,
+  imports: [CommonModule],
+  template: `
+    <section class="widget news">
       <h2>
         <span>📰 AI Briefing</span>
         <div class="header-actions">
-          <button class="icon-btn" (click)="toggleAudio()" [disabled]="!briefing?.audioPlaylist?.length">
-            {{ isPlaying ? '⏸' : '▶' }}
+          <button class="action-btn" (click)="refreshNews()" [disabled]="loading">
+            {{ loading ? '[ ... ]' : '[ REFRESH ]' }}
           </button>
-          <a routerLink="/news-settings" class="settings-link" title="Configure Sources">⚙️</a>
+          <button class="action-btn" (click)="toggleAudio()" [disabled]="!briefing?.audioPlaylist?.length">
+            {{ isPlaying ? '[ STOP ]' : '[ NARRATE ]' }}
+          </button>
         </div>
       </h2>
       
       <div *ngIf="loading" class="loading">
-        <span class="spinner">↻</span> Generating briefing...
+        <span class="spinner">↻</span> {{ loadingMessage }}
       </div>
       
-      <div *ngIf="briefing">
+      <!-- AI Summary View -->
+      <div *ngIf="!loading && briefing && hasSummary">
+        <div class="summary-header">AI Summary (Gemini)</div>
         <ul class="summary-list">
           <li *ngFor="let line of summaryLines">{{ line }}</li>
         </ul>
-        <div class="actions">
-            <!-- Reuse global link style if possible or keep simple -->
-            <a routerLink="/news" class="read-more">Read Full Briefing →</a>
+      </div>
+
+      <!-- Fallback Headlines View (when no summary available) -->
+      <div *ngIf="!loading && briefing && !hasSummary">
+        <div class="summary-header">Headlines (Raw)</div>
+        <ul class="headline-list">
+          <li *ngFor="let article of displayArticles">
+            <span class="category">[{{ article.category }}]</span>
+            <span class="title">{{ article.title }}</span>
+          </li>
+        </ul>
+        <div class="fallback-notice" *ngIf="needsConfig">
+          ⚠ Configure Gemini API key for AI summaries
         </div>
       </div>
        
       <div *ngIf="!loading && !briefing" class="setup-notice">
         <p *ngIf="needsConfig; else genericError">
-          AI News requires an OpenAI key to summarize.
+          AI News requires a Gemini API key to summarize.
           <br>
-          <a routerLink="/admin" class="setup-link">Click here to set it up</a>
+          <span class="setup-link">Configure in Settings → Admin Controls</span>
         </p>
         <ng-template #genericError>
           <p>Could not load news. Check your connection.</p>
@@ -52,141 +65,177 @@ import { RouterModule } from '@angular/router';
       </div>
     </section>
   `,
-    styles: [`
+  styles: [`
     :host { display: block; }
     h2 {
         display: flex; justify-content: space-between; align-items: center;
         margin: 0 0 10px 0 !important; font-size: 1rem; color: var(--text-secondary);
         border-bottom: 1px dashed var(--text-secondary); padding-bottom: 5px;
     }
-    .header-actions { display: flex; gap: 10px; }
-    .icon-btn, .settings-link {
+    .header-actions { display: flex; gap: 5px; }
+    .action-btn {
         background: black; border: 1px solid var(--text-secondary); color: var(--text-secondary);
-        cursor: pointer; padding: 2px 8px; font-family: var(--font-mono); font-size: 0.8rem;
-        text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
-        height: auto; width: auto; border-radius: 0;
+        cursor: pointer; padding: 2px 6px; font-family: var(--font-mono); font-size: 0.7rem;
+        text-decoration: none;
     }
-    .icon-btn:hover, .settings-link:hover {
-        background: var(--text-secondary); color: black;
-    }
-    .icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .action-btn:hover { background: var(--text-secondary); color: black; }
+    .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     
     .loading { color: var(--text-secondary); text-align: center; padding: 10px; }
-    .spinner { animation: blink 1s infinite; display: inline-block; }
-    @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
+    .spinner { animation: spin 1s linear infinite; display: inline-block; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    .summary-header { color: var(--text-highlight); font-size: 0.8rem; margin-bottom: 8px; border-bottom: 1px solid var(--border-color); padding-bottom: 3px; }
 
     .summary-list { list-style: none; padding: 0; margin: 0; }
     .summary-list li { margin-bottom: 8px; color: var(--text-primary); padding-left: 15px; position: relative; }
     .summary-list li::before { content: ">"; position: absolute; left: 0; color: var(--text-secondary); }
 
-    .read-more { display: inline-block; margin-top: 10px; color: var(--text-secondary); text-decoration: none; border: 1px solid var(--text-secondary); padding: 2px 5px; }
-    .read-more:hover { background: var(--text-secondary); color: black; }
+    .headline-list { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; }
+    .headline-list li { margin-bottom: 5px; color: var(--text-primary); font-size: 0.85rem; }
+    .headline-list .category { color: var(--text-secondary); font-size: 0.7rem; margin-right: 5px; }
+    .headline-list .title { color: var(--text-primary); }
+
+    .fallback-notice { color: var(--text-alert); font-size: 0.75rem; margin-top: 10px; padding: 5px; border: 1px dashed var(--text-alert); }
 
     .now-playing { color: var(--text-highlight); margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 5px; }
 
     .setup-notice { border: 1px solid var(--text-alert); padding: 10px; color: var(--text-alert); text-align: center; margin-top: 10px; }
-    .setup-link { color: var(--text-alert); text-decoration: underline; font-weight: bold; }
+    .setup-link { color: var(--text-primary); font-weight: bold; }
   `]
 })
 export class NewsWidgetComponent implements OnInit, OnDestroy {
-    briefing: any = null;
-    loading = true;
-    needsConfig = false;
-    summaryLines: string[] = [];
+  briefing: any = null;
+  loading = true;
+  loadingMessage = 'Fetching news...';
+  needsConfig = false;
+  summaryLines: string[] = [];
+  displayArticles: any[] = [];
+  hasSummary = false;
 
-    isPlaying = false;
-    currentTrackIndex = -1;
-    currentAudioSrc = '';
+  isPlaying = false;
+  currentTrackIndex = -1;
+  currentAudioSrc = '';
 
-    @ViewChild('audioPlayer') audioPlayer!: ElementRef<HTMLAudioElement>;
+  @ViewChild('audioPlayer') audioPlayer!: ElementRef<HTMLAudioElement>;
 
-    // To update date
-    private pollInterval: any;
+  private pollInterval: any;
 
-    constructor(private http: HttpClient) { }
+  constructor(private http: HttpClient) { }
 
-    ngOnInit() {
-        this.fetchNews();
-    }
+  ngOnInit() {
+    this.fetchNews();
+  }
 
-    ngOnDestroy() {
-        if (this.pollInterval) clearInterval(this.pollInterval);
-    }
+  ngOnDestroy() {
+    if (this.pollInterval) clearInterval(this.pollInterval);
+  }
 
-    fetchNews() {
-        this.http.get('/api/news').subscribe({
-            next: (data: any) => {
-                this.briefing = data;
-                this.processSummary();
-                this.loading = false;
-                this.needsConfig = false;
-            },
-            error: (err: any) => {
-                console.error("News fetch failed", err);
-                if (err.status === 503) {
-                    this.needsConfig = true;
-                }
-                this.loading = false;
-            }
-        });
-    }
-
-    processSummary() {
-        if (this.briefing?.summaryText) {
-            // Filter out headers, take first 5 bullets for the widget
-            const lines = this.briefing.summaryText.split('\n');
-            this.summaryLines = lines
-                .filter((l: string) => l.trim() && !l.trim().startsWith('#'))
-                .map((l: string) => l.trim().replace(/^[-*•]\s*/, ''))
-                .filter((l: string) => l && l.length > 5)
-                .slice(0, 5);
+  fetchNews() {
+    this.loading = true;
+    this.loadingMessage = 'Fetching news...';
+    this.http.get('/api/news').subscribe({
+      next: (data: any) => {
+        this.briefing = data;
+        this.processBriefing();
+        this.loading = false;
+        this.needsConfig = false;
+      },
+      error: (err: any) => {
+        console.error("News fetch failed", err);
+        if (err.status === 503) {
+          this.needsConfig = true;
         }
-    }
+        this.loading = false;
+      }
+    });
+  }
 
-    toggleAudio() {
-        if (!this.audioPlayer) return;
-        const player = this.audioPlayer.nativeElement;
-
-        if (this.isPlaying) {
-            player.pause();
-            this.isPlaying = false;
-        } else {
-            if (this.currentTrackIndex === -1 && this.briefing?.audioPlaylist?.length) {
-                this.playTrack(0);
-            } else {
-                player.play().catch(e => console.error(e));
-                this.isPlaying = true;
-            }
+  refreshNews() {
+    this.loading = true;
+    this.loadingMessage = 'Regenerating briefing...';
+    this.http.post('/api/news/refresh', {}).subscribe({
+      next: (data: any) => {
+        this.briefing = data;
+        this.processBriefing();
+        this.loading = false;
+        this.needsConfig = false;
+      },
+      error: (err: any) => {
+        console.error("News refresh failed", err);
+        if (err.status === 503) {
+          this.needsConfig = true;
         }
-    }
+        this.loading = false;
+      }
+    });
+  }
 
-    playTrack(index: number) {
-        if (!this.briefing?.audioPlaylist?.[index]) {
-            this.isPlaying = false;
-            this.currentTrackIndex = -1;
-            return;
-        }
-        this.currentTrackIndex = index;
-        const track = this.briefing.audioPlaylist[index];
-        this.currentAudioSrc = track.url;
-
-        // Allow angular binding update then play
-        setTimeout(() => {
-            if (this.audioPlayer) {
-                this.audioPlayer.nativeElement.load();
-                this.audioPlayer.nativeElement.play().catch(e => console.error("Play failed", e));
-                this.isPlaying = true;
-            }
-        }, 50);
+  processBriefing() {
+    // Check if we have a valid AI summary
+    if (this.briefing?.summaryText &&
+      this.briefing.summaryText !== "No summary generated." &&
+      this.briefing.summaryText !== "Error generating summary." &&
+      this.briefing.summaryText.length > 50) {
+      this.hasSummary = true;
+      const lines = this.briefing.summaryText.split('\n');
+      this.summaryLines = lines
+        .filter((l: string) => l.trim() && !l.trim().startsWith('#'))
+        .map((l: string) => l.trim().replace(/^[-*•]\s*/, ''))
+        .filter((l: string) => l && l.length > 5)
+        .slice(0, 7);
+    } else {
+      // Fallback to raw headlines
+      this.hasSummary = false;
+      this.needsConfig = !this.briefing?.summaryText || this.briefing.summaryText === "No summary generated.";
+      if (this.briefing?.articles) {
+        this.displayArticles = this.briefing.articles.slice(0, 10);
+      }
     }
+  }
 
-    onAudioEnded() {
-        this.playTrack(this.currentTrackIndex + 1);
-    }
+  toggleAudio() {
+    if (!this.audioPlayer) return;
+    const player = this.audioPlayer.nativeElement;
 
-    onAudioError(e: any) {
-        console.error("Audio error", e);
-        // Skip defective track
-        this.playTrack(this.currentTrackIndex + 1);
+    if (this.isPlaying) {
+      player.pause();
+      this.isPlaying = false;
+    } else {
+      if (this.currentTrackIndex === -1 && this.briefing?.audioPlaylist?.length) {
+        this.playTrack(0);
+      } else {
+        player.play().catch(e => console.error(e));
+        this.isPlaying = true;
+      }
     }
+  }
+
+  playTrack(index: number) {
+    if (!this.briefing?.audioPlaylist?.[index]) {
+      this.isPlaying = false;
+      this.currentTrackIndex = -1;
+      return;
+    }
+    this.currentTrackIndex = index;
+    const track = this.briefing.audioPlaylist[index];
+    this.currentAudioSrc = track.url;
+
+    setTimeout(() => {
+      if (this.audioPlayer) {
+        this.audioPlayer.nativeElement.load();
+        this.audioPlayer.nativeElement.play().catch(e => console.error("Play failed", e));
+        this.isPlaying = true;
+      }
+    }, 50);
+  }
+
+  onAudioEnded() {
+    this.playTrack(this.currentTrackIndex + 1);
+  }
+
+  onAudioError(e: any) {
+    console.error("Audio error", e);
+    this.playTrack(this.currentTrackIndex + 1);
+  }
 }

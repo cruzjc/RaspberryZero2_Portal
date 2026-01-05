@@ -4,7 +4,6 @@ import { RouterOutlet, Router } from '@angular/router';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { NewsWidgetComponent } from './news-widget.component';
-import { NewsSettingsComponent } from './news-settings.component';
 import { AdminSettingsComponent } from './admin-settings.component';
 
 interface Resource {
@@ -16,7 +15,7 @@ interface Resource {
 @Component({
     selector: 'app-root',
     standalone: true,
-    imports: [CommonModule, RouterOutlet, HttpClientModule, DatePipe, NewsWidgetComponent, NewsSettingsComponent, AdminSettingsComponent],
+    imports: [CommonModule, RouterOutlet, HttpClientModule, DatePipe, NewsWidgetComponent, AdminSettingsComponent],
     templateUrl: './app.component.html',
     styleUrl: './app.component.css',
 })

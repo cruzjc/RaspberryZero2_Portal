@@ -1,6 +1,5 @@
 // Moved import to avoid Angular dependency
 import express from 'express';
-import OpenAI from 'openai';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
@@ -28,19 +27,17 @@ function saveConfig(config) {
 }
 // Initialize config from env or file
 let appConfig = readConfig();
-if (process.env['OPENAI_API_KEY'] && !appConfig.openaiApiKey) {
-    appConfig.openaiApiKey = process.env['OPENAI_API_KEY'];
+if (process.env['GEMINI_API_KEY'] && !appConfig.geminiApiKey) {
+    appConfig.geminiApiKey = process.env['GEMINI_API_KEY'];
 }
 if (process.env['ELEVENLABS_API_KEY'] && !appConfig.elevenLabsApiKey) {
     appConfig.elevenLabsApiKey = process.env['ELEVENLABS_API_KEY'];
 }
 // Lazy initialization - only create when keys available
-let openai = null;
 let newsService = null;
 function initializeServices() {
-    if (appConfig.openaiApiKey) {
-        openai = new OpenAI({ apiKey: appConfig.openaiApiKey });
-        newsService = new NewsService(join(serverDistFolder, 'data'), openai, appConfig.elevenLabsApiKey, appConfig.inworldApiKey, appConfig.inworldSecret);
+    if (appConfig.geminiApiKey) {
+        newsService = new NewsService(join(serverDistFolder, 'data'), appConfig.geminiApiKey, appConfig.elevenLabsApiKey, appConfig.inworldApiKey, appConfig.inworldSecret);
         return true;
     }
     return false;
@@ -86,16 +83,16 @@ app.get('/session', async (req, res) => {
 // API Configuration Endpoints
 app.get('/api/config', (req, res) => {
     res.json({
-        hasOpenAI: !!appConfig.openaiApiKey,
+        hasGemini: !!appConfig.geminiApiKey,
         hasElevenLabs: !!appConfig.elevenLabsApiKey,
         hasInworld: !!appConfig.inworldApiKey && !!appConfig.inworldSecret,
         servicesInitialized: !!newsService
     });
 });
 app.post('/api/config', (req, res) => {
-    const { openaiApiKey, elevenLabsApiKey, inworldApiKey, inworldSecret } = req.body;
-    if (openaiApiKey) {
-        appConfig.openaiApiKey = openaiApiKey;
+    const { geminiApiKey, elevenLabsApiKey, inworldApiKey, inworldSecret } = req.body;
+    if (geminiApiKey) {
+        appConfig.geminiApiKey = geminiApiKey;
     }
     if (elevenLabsApiKey !== undefined) {
         appConfig.elevenLabsApiKey = elevenLabsApiKey || undefined;
@@ -113,7 +110,7 @@ app.post('/api/config', (req, res) => {
     res.json({
         success: true,
         initialized,
-        hasOpenAI: !!appConfig.openaiApiKey,
+        hasGemini: !!appConfig.geminiApiKey,
         hasElevenLabs: !!appConfig.elevenLabsApiKey,
         hasInworld: !!appConfig.inworldApiKey && !!appConfig.inworldSecret
     });
@@ -121,7 +118,6 @@ app.post('/api/config', (req, res) => {
 app.delete('/api/config', (req, res) => {
     appConfig = {};
     saveConfig(appConfig);
-    openai = null;
     newsService = null;
     res.json({ success: true, message: 'Configuration cleared' });
 });
@@ -204,6 +200,26 @@ app.get('/api/news', async (req, res) => {
         res.status(500).json({ error: 'Failed to generate briefing' });
     }
 });
+// Manual refresh endpoint (forces regeneration)
+app.post('/api/news/refresh', async (req, res) => {
+    if (!newsService) {
+        res.status(503).json({
+            error: 'News service not initialized',
+            needsConfig: true,
+            message: 'Please configure Gemini API key in settings'
+        });
+        return;
+    }
+    try {
+        console.log('Manual news refresh triggered...');
+        const briefing = await newsService.generateDailyBriefing(true); // force=true
+        res.json(briefing);
+    }
+    catch (err) {
+        console.error('News Refresh Error:', err);
+        res.status(500).json({ error: 'Failed to regenerate briefing' });
+    }
+});
 app.get('/api/audio/:filename', (req, res) => {
     // Serve audio files from the data directory
     const filePath = join(serverDistFolder, 'data/audio', req.params.filename);
@@ -214,75 +230,13 @@ app.get('/api/audio/:filename', (req, res) => {
         res.status(404).send('Audio not found');
     }
 });
-// News Source Management
+// News Sources (read-only, hardcoded)
 app.get('/api/news/sources', (req, res) => {
     if (!newsService) {
         res.status(503).json({ error: 'News service not configured' });
         return;
     }
-    try {
-        const sources = newsService.getSources();
-        res.json(sources);
-    }
-    catch (err) {
-        console.error('Error getting sources:', err);
-        res.status(500).json({ error: 'Failed to get sources' });
-    }
-});
-app.post('/api/news/sources', (req, res) => {
-    if (!newsService) {
-        res.status(503).json({ error: 'News service not configured' });
-        return;
-    }
-    try {
-        const sources = newsService.getSources();
-        const newSource = req.body;
-        sources.push(newSource);
-        newsService.saveSources(sources);
-        res.json(newSource);
-    }
-    catch (err) {
-        console.error('Error adding source:', err);
-        res.status(500).json({ error: 'Failed to add source' });
-    }
-});
-app.put('/api/news/sources/:id', (req, res) => {
-    if (!newsService) {
-        res.status(503).json({ error: 'News service not configured' });
-        return;
-    }
-    try {
-        const sources = newsService.getSources();
-        const index = sources.findIndex(s => s.id === req.params['id']);
-        if (index === -1) {
-            res.status(404).json({ error: 'Source not found' });
-            return;
-        }
-        sources[index] = req.body;
-        newsService.saveSources(sources);
-        res.json(sources[index]);
-    }
-    catch (err) {
-        console.error('Error updating source:', err);
-        res.status(500).json({ error: 'Failed to update source' });
-    }
-});
-app.delete('/api/news/sources/:id', (req, res) => {
-    if (!newsService) {
-        res.status(503).json({ error: 'News service not configured' });
-        return;
-    }
-    try {
-        let sources = newsService.getSources();
-        const beforeLength = sources.length;
-        sources = sources.filter(s => s.id !== req.params['id']);
-        newsService.saveSources(sources);
-        res.json({ success: sources.length !== beforeLength });
-    }
-    catch (err) {
-        console.error('Error deleting source:', err);
-        res.status(500).json({ error: 'Failed to delete source' });
-    }
+    res.json(newsService.getSources());
 });
 app.use(express.static(browserDistFolder, {
     maxAge: '1y',

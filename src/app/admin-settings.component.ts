@@ -25,31 +25,31 @@ import { RouterModule } from '@angular/router';
       </div>
 
       <div class="settings-grid">
-        <!-- OpenAI Configuration -->
+        <!-- Gemini Configuration -->
         <div class="config-card glass-panel">
           <div class="card-header">
-            <h2>🤖 OpenAI API Key</h2>
-            <span class="badge" [class.active]="configStatus.hasOpenAI">
-              {{ configStatus.hasOpenAI ? 'Configured' : 'Not Set' }}
+            <h2>✨ Gemini API Key</h2>
+            <span class="badge" [class.active]="configStatus.hasGemini">
+              {{ configStatus.hasGemini ? 'Configured' : 'Required' }}
             </span>
           </div>
           <p class="description">
-            Required for news summarization and AI features.
-            Get your key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>.
+            Required for AI news summarization (gemini-2.0-flash).
+            Get your key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.
           </p>
           <div class="input-group">
             <input 
               type="password" 
-              [(ngModel)]="openaiKey" 
-              placeholder="sk-..."
-              [class.configured]="configStatus.hasOpenAI"
+              [(ngModel)]="geminiKey" 
+              placeholder="AIza..."
+              [class.configured]="configStatus.hasGemini"
             />
-            <button class="show-btn" (click)="toggleOpenAIVisibility()">
-              {{ showOpenAI ? '🙈' : '👁️' }}
+            <button class="show-btn" (click)="toggleGeminiVisibility()">
+              {{ showGemini ? '🙈' : '👁️' }}
             </button>
           </div>
-          <div class="key-display" *ngIf="showOpenAI && openaiKey">
-            <code>{{ openaiKey }}</code>
+          <div class="key-display" *ngIf="showGemini && geminiKey">
+            <code>{{ geminiKey }}</code>
           </div>
         </div>
 
@@ -62,7 +62,7 @@ import { RouterModule } from '@angular/router';
             </span>
           </div>
           <p class="description">
-            Alternative for AI voice narration.
+            For AI voice chatbot (ESTABLISH_LINK button).
             Get your key from <a href="https://elevenlabs.io/" target="_blank">ElevenLabs</a>.
           </p>
           <div class="input-group">
@@ -84,13 +84,13 @@ import { RouterModule } from '@angular/router';
         <!-- Inworld Configuration -->
         <div class="config-card glass-panel">
           <div class="card-header">
-            <h2>🗣️ Inworld TTS (Preferred)</h2>
+            <h2>🗣️ Inworld TTS</h2>
             <span class="badge optional" [class.active]="configStatus.hasInworld">
               {{ configStatus.hasInworld ? 'Configured' : 'Optional' }}
             </span>
           </div>
           <p class="description">
-            Primary engine for speech synthesis.
+            Text-to-speech for reading AI briefings.
             Get keys from <a href="https://inworld.ai/" target="_blank">Inworld Studio</a>.
           </p>
           <div class="input-group">
@@ -116,14 +116,14 @@ import { RouterModule } from '@angular/router';
         <button class="save-btn" (click)="saveConfig()" [disabled]="saving">
           {{ saving ? 'Saving...' : 'Save Configuration' }}
         </button>
-        <button class="clear-btn" (click)="clearConfig()" *ngIf="configStatus.hasOpenAI || configStatus.hasElevenLabs || configStatus.hasInworld">
+        <button class="clear-btn" (click)="clearConfig()" *ngIf="configStatus.hasGemini || configStatus.hasElevenLabs || configStatus.hasInworld">
           Clear All Keys
         </button>
       </div>
 
       <div class="info-box glass-panel">
         <h3>🔒 Security Note</h3>
-        <p>API keys are stored server-side in <code>config.json</code>. This is a private dashboard - ensure your Raspberry Pi is on a secure network.</p>
+        <p>API keys are stored server-side in <code>~/.portal-config.json</code>. This is a private dashboard - ensure your Raspberry Pi is on a secure network.</p>
         <p><strong>Never share your API keys publicly!</strong></p>
       </div>
     </div>
@@ -170,17 +170,17 @@ import { RouterModule } from '@angular/router';
   `]
 })
 export class AdminSettingsComponent implements OnInit {
-  openaiKey = '';
+  geminiKey = '';
   elevenLabsKey = '';
   inworldApiKey = '';
   inworldSecret = '';
 
-  showOpenAI = false;
+  showGemini = false;
   showElevenLabs = false;
   saving = false;
 
   configStatus = {
-    hasOpenAI: false,
+    hasGemini: false,
     hasElevenLabs: false,
     hasInworld: false,
     servicesInitialized: false
@@ -201,8 +201,8 @@ export class AdminSettingsComponent implements OnInit {
     });
   }
 
-  toggleOpenAIVisibility() {
-    this.showOpenAI = !this.showOpenAI;
+  toggleGeminiVisibility() {
+    this.showGemini = !this.showGemini;
   }
 
   toggleElevenLabsVisibility() {
@@ -210,14 +210,10 @@ export class AdminSettingsComponent implements OnInit {
   }
 
   saveConfig() {
-    if (!this.openaiKey && !this.inworldApiKey && !this.elevenLabsKey) {
-      // Just check if we are clearing? 
-    }
-
     this.saving = true;
     const payload: any = {};
 
-    if (this.openaiKey) payload.openaiApiKey = this.openaiKey;
+    if (this.geminiKey) payload.geminiApiKey = this.geminiKey;
     if (this.elevenLabsKey) payload.elevenLabsApiKey = this.elevenLabsKey;
     if (this.inworldApiKey) payload.inworldApiKey = this.inworldApiKey;
     if (this.inworldSecret) payload.inworldSecret = this.inworldSecret;
@@ -226,7 +222,7 @@ export class AdminSettingsComponent implements OnInit {
       next: (data) => {
         this.saving = false;
         this.configStatus = data;
-        this.openaiKey = '';
+        this.geminiKey = '';
         this.elevenLabsKey = '';
         this.inworldApiKey = '';
         this.inworldSecret = '';
@@ -246,12 +242,12 @@ export class AdminSettingsComponent implements OnInit {
 
     this.http.delete('/api/config').subscribe({
       next: () => {
-        this.openaiKey = '';
+        this.geminiKey = '';
         this.elevenLabsKey = '';
         this.inworldApiKey = '';
         this.inworldSecret = '';
         this.configStatus = {
-          hasOpenAI: false,
+          hasGemini: false,
           hasElevenLabs: false,
           hasInworld: false,
           servicesInitialized: false

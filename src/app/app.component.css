@@ -223,3 +223,44 @@ html {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-primary);
 }
+
+/* GitHub Activity Section */
+.github-activity {
+  margin-top: 20px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+}
+
+.github-activity .section-title {
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+.contribution-chart {
+  overflow-x: auto;
+  padding: 10px 0;
+}
+
+.waffle-chart {
+  width: 100%;
+  max-width: 800px;
+  height: auto;
+  filter: brightness(1.1);
+}
+
+.github-link {
+  margin-top: 5px;
+  font-size: 0.8rem;
+}
+
+.github-link a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  border: 1px solid var(--text-secondary);
+  padding: 2px 8px;
+}
+
+.github-link a:hover {
+  background: var(--text-secondary);
+  color: black;
+}

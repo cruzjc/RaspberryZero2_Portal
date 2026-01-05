@@ -35,11 +35,14 @@ import { HttpClient } from '@angular/common/http';
 
       <!-- Fallback Headlines View (when no summary available) -->
       <div *ngIf="!loading && briefing && !hasSummary">
-        <div class="summary-header">Headlines (Raw)</div>
+        <div class="summary-header">Latest Headlines</div>
         <ul class="headline-list">
-          <li *ngFor="let article of displayArticles">
-            <span class="category">[{{ article.category }}]</span>
-            <span class="title">{{ article.title }}</span>
+          <li *ngFor="let article of displayArticles" class="headline-item">
+            <div class="headline-top">
+              <span class="category">[{{ article.category }}]</span>
+              <span class="title">{{ article.title }}</span>
+            </div>
+            <div class="snippet" *ngIf="article.snippet">{{ article.snippet | slice:0:150 }}{{ article.snippet.length > 150 ? '...' : '' }}</div>
           </li>
         </ul>
         <div class="fallback-notice" *ngIf="needsConfig">
@@ -91,10 +94,13 @@ import { HttpClient } from '@angular/common/http';
     .summary-list li { margin-bottom: 8px; color: var(--text-primary); padding-left: 15px; position: relative; }
     .summary-list li::before { content: ">"; position: absolute; left: 0; color: var(--text-secondary); }
 
-    .headline-list { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; }
-    .headline-list li { margin-bottom: 5px; color: var(--text-primary); font-size: 0.85rem; }
-    .headline-list .category { color: var(--text-secondary); font-size: 0.7rem; margin-right: 5px; }
-    .headline-list .title { color: var(--text-primary); }
+    .headline-list { list-style: none; padding: 0; margin: 0; max-height: 350px; overflow-y: auto; }
+    .headline-item { margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dashed var(--border-color); }
+    .headline-item:last-child { border-bottom: none; }
+    .headline-top { display: flex; gap: 5px; align-items: baseline; }
+    .headline-list .category { color: var(--text-secondary); font-size: 0.7rem; white-space: nowrap; }
+    .headline-list .title { color: var(--text-primary); font-weight: bold; font-size: 0.85rem; }
+    .snippet { color: var(--text-secondary); font-size: 0.75rem; margin-top: 4px; padding-left: 5px; line-height: 1.3; }
 
     .fallback-notice { color: var(--text-alert); font-size: 0.75rem; margin-top: 10px; padding: 5px; border: 1px dashed var(--text-alert); }
 
@@ -189,7 +195,7 @@ export class NewsWidgetComponent implements OnInit, OnDestroy {
       this.hasSummary = false;
       this.needsConfig = !this.briefing?.summaryText || this.briefing.summaryText === "No summary generated.";
       if (this.briefing?.articles) {
-        this.displayArticles = this.briefing.articles.slice(0, 10);
+        this.displayArticles = this.briefing.articles.slice(0, 15);
       }
     }
   }

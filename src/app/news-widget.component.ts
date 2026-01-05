@@ -55,82 +55,37 @@ import { RouterModule } from '@angular/router';
     styles: [`
     :host { display: block; }
     h2 {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin: 0 0 16px 0 !important; /* Override global slightly if needed */
-        font-size: 1.2rem;
-        color: var(--accent-color);
+        display: flex; justify-content: space-between; align-items: center;
+        margin: 0 0 10px 0 !important; font-size: 1rem; color: var(--text-secondary);
+        border-bottom: 1px dashed var(--text-secondary); padding-bottom: 5px;
     }
-    .header-actions {
-        display: flex;
-        gap: 8px;
-        align-items: center;
+    .header-actions { display: flex; gap: 10px; }
+    .icon-btn, .settings-link {
+        background: black; border: 1px solid var(--text-secondary); color: var(--text-secondary);
+        cursor: pointer; padding: 2px 8px; font-family: var(--font-mono); font-size: 0.8rem;
+        text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
+        height: auto; width: auto; border-radius: 0;
     }
-    .icon-btn { 
-        background: rgba(255,255,255,0.1); 
-        border: 1px solid rgba(255,255,255,0.2);
-        color: white; border-radius: 50%; width: 32px; height: 32px; 
-        cursor: pointer; display: inline-flex; 
-        align-items: center; justify-content: center; font-size: 0.9rem; 
-        transition: all 0.2s;
+    .icon-btn:hover, .settings-link:hover {
+        background: var(--text-secondary); color: black;
     }
-    .icon-btn:hover { background: var(--accent-color); border-color: var(--accent-color); }
-    .icon-btn:disabled { opacity: 0.3; cursor: not-allowed; background: transparent; }
+    .icon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     
-    .settings-link {
-        font-size: 1.2rem;
-        color: rgba(255,255,255,0.5);
-        text-decoration: none;
-        transition: all 0.2s;
-        display: inline-flex;
-    }
-    .settings-link:hover {
-        color: var(--accent-color);
-        transform: rotate(30deg);
-    }
-    
-    .loading { 
-        font-size: 0.9rem; color: var(--text-secondary); 
-        padding: 20px 0; text-align: center; 
-    }
-    .spinner { display: inline-block; animation: spin 1s linear infinite; margin-right: 8px; }
-    @keyframes spin { 100% { transform: rotate(360deg); } }
-    
-    .summary-list { 
-        list-style-type: none; padding: 0; margin: 0; 
-        font-size: 0.95rem; line-height: 1.6; color: var(--text-primary);
-    }
-    .summary-list li { 
-        margin-bottom: 10px; padding-left: 20px; position: relative; 
-    }
-    .summary-list li::before {
-        content: "•"; position: absolute; left: 0; color: var(--accent-color); font-weight: bold;
-    }
-    
-    .read-more { 
-        display: inline-block; margin-top: 10px; color: var(--accent-color); 
-        text-decoration: none; font-size: 0.9rem; font-weight: 500;
-        transition: color 0.2s;
-    }
-    .read-more:hover { color: #fff; text-decoration: underline; }
-    
-    .now-playing { 
-        font-size: 0.8rem; color: var(--success-color); margin-top: 15px; 
-        padding-top: 10px; border-top: 1px solid var(--glass-border);
-        display: flex; align-items: center; gap: 8px;
-    }
-    
-    .setup-notice {
-        font-size: 0.9rem; color: var(--text-secondary); text-align: center;
-        padding: 20px; border-radius: 8px; border: 1px dashed var(--glass-border);
-        background: rgba(0,0,0,0.1);
-    }
-    .setup-link {
-        color: var(--accent-color); font-weight: bold; text-decoration: none;
-        display: inline-block; margin-top: 5px;
-    }
-    .setup-link:hover { text-decoration: underline; }
+    .loading { color: var(--text-secondary); text-align: center; padding: 10px; }
+    .spinner { animation: blink 1s infinite; display: inline-block; }
+    @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
+
+    .summary-list { list-style: none; padding: 0; margin: 0; }
+    .summary-list li { margin-bottom: 8px; color: var(--text-primary); padding-left: 15px; position: relative; }
+    .summary-list li::before { content: ">"; position: absolute; left: 0; color: var(--text-secondary); }
+
+    .read-more { display: inline-block; margin-top: 10px; color: var(--text-secondary); text-decoration: none; border: 1px solid var(--text-secondary); padding: 2px 5px; }
+    .read-more:hover { background: var(--text-secondary); color: black; }
+
+    .now-playing { color: var(--text-highlight); margin-top: 10px; border-top: 1px solid var(--border-color); padding-top: 5px; }
+
+    .setup-notice { border: 1px solid var(--text-alert); padding: 10px; color: var(--text-alert); text-align: center; margin-top: 10px; }
+    .setup-link { color: var(--text-alert); text-decoration: underline; font-weight: bold; }
   `]
 })
 export class NewsWidgetComponent implements OnInit, OnDestroy {

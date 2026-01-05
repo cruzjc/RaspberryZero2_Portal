@@ -117,245 +117,49 @@ interface NewsSource {
     </div>
   `,
   styles: [`
-    .settings-container {
-      padding: 15px;
-      max-width: 800px;
-      margin: 0 auto;
-      color: var(--text-primary);
-    }
-    
-    .settings-header {
-      margin-bottom: 20px;
-      padding-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 15px;
-      border-bottom: 1px solid var(--glass-border);
-    }
-    
-    .back-link {
-      color: var(--accent-color);
-      text-decoration: none;
-      font-size: 0.9rem;
-      padding: 5px 10px;
-      background: rgba(255,255,255,0.05);
-      border-radius: 6px;
-    }
-    
-    h1 { font-size: 1.4rem; margin: 0; }
-    h2 { font-size: 1.1rem; margin: 20px 0 10px; color: #fff; opacity: 0.9; }
-    
-    .category-group { margin-bottom: 15px; }
-    
-    .category-title {
-      font-size: 0.8rem;
-      color: var(--accent-color);
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin: 10px 0 8px;
-      padding-left: 5px;
-      opacity: 0.8;
-    }
-    
-    .source-card {
-      background: var(--glass-bg);
-      backdrop-filter: blur(10px);
-      border: 1px solid var(--glass-border);
-      padding: 10px 15px;
-      border-radius: 8px;
-      margin-bottom: 8px;
-    }
-    
-    .source-header {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    
-    .source-info { flex: 1; overflow: hidden; }
-    .source-info h3 { 
-      font-size: 1rem; 
-      margin: 0; 
-      white-space: nowrap; 
-      overflow: hidden; 
-      text-overflow: ellipsis; 
-    }
-    
-    .source-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 5px;
-      padding-left: 45px; /* Align with text */
-    }
+    .settings-container { padding: 10px; color: var(--text-primary); }
+    .settings-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; border-bottom: 1px dashed var(--text-secondary); padding-bottom: 10px; }
+    .back-link { color: var(--text-secondary); text-decoration: none; border: 1px solid var(--text-secondary); padding: 2px 8px; font-size: 0.9rem; }
+    .back-link:hover { background: var(--text-secondary); color: black; }
+    h1 { font-size: 1.2rem; margin: 0; color: var(--text-primary); text-transform: uppercase; }
 
-    .source-url {
-      font-size: 0.7rem;
-      color: var(--text-secondary);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 80%;
-    }
+    .sources-list { margin-bottom: 20px; }
+    .category-group { margin-bottom: 15px; border-left: 1px solid var(--text-secondary); padding-left: 10px; }
+    .category-title { color: var(--text-secondary); font-size: 0.9rem; text-transform: uppercase; margin: 5px 0; }
     
-    .source-type-badge {
-      font-size: 0.7rem;
-      opacity: 0.7;
-    }
-    
-    .toggle-switch {
-      position: relative;
-      display: inline-block;
-      width: 36px;
-      height: 20px;
-      flex-shrink: 0;
-    }
-    
+    .source-card { border: 1px solid var(--border-color); padding: 5px; margin-bottom: 5px; }
+    .source-header { display: flex; align-items: center; gap: 10px; }
+    .source-info h3 { font-size: 1rem; margin: 0; color: var(--text-primary); }
+    .delete-btn { background: none; border: 1px solid var(--text-alert); color: var(--text-alert); cursor: pointer; padding: 0 5px; margin-left: auto; }
+    .delete-btn:hover { background: var(--text-alert); color: black; }
+
+    .source-meta { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-secondary); padding-left: 45px; }
+    .source-type-badge.podcast { color: var(--text-highlight); }
+
+    /* Retro Toggle */
+    .toggle-switch { position: relative; display: inline-block; width: 30px; height: 16px; border: 1px solid var(--text-secondary); }
     .toggle-switch input { opacity: 0; width: 0; height: 0; }
-    
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-color: rgba(255,255,255,0.1);
-      transition: 0.3s;
-      border-radius: 20px;
-    }
-    
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 14px; width: 14px;
-      left: 3px; bottom: 3px;
-      background-color: #fff;
-      transition: 0.3s;
-      border-radius: 50%;
-    }
-    
-    input:checked + .slider { background: var(--accent-gradient); }
-    input:checked + .slider:before { transform: translateX(16px); }
-    
-    .delete-btn {
-      background: none;
-      border: none;
-      font-size: 1.2rem;
-      cursor: pointer;
-      opacity: 0.4;
-      padding: 0 5px;
-    }
-    .delete-btn:hover { opacity: 1; color: #ff6b6b; }
-    
-    .add-source-section {
-      margin-top: 30px;
-      background: var(--glass-bg);
-      padding: 15px;
-      border-radius: 10px;
-      border: 1px solid var(--glass-border);
-    }
-    
-    .form-grid {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-    
-    @media (max-width: 600px) {
-      .form-grid { flex-wrap: wrap; }
-      .form-group { width: 100%; }
-      .form-group.short { width: auto; flex: 1; }
-      .add-btn { width: auto; }
-    }
-    
-    .form-group { flex: 2; }
-    .form-group.short { flex: 1; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: black; transition: .2s; }
+    .slider:before { position: absolute; content: ""; height: 10px; width: 10px; left: 2px; bottom: 2px; background-color: var(--text-secondary); transition: .2s; }
+    input:checked + .slider { background-color: var(--text-secondary); }
+    input:checked + .slider:before { transform: translateX(14px); background-color: black; }
 
-    .form-group input, .form-group select {
-      width: 100%;
-      padding: 8px 12px;
-      background: rgba(0,0,0,0.2);
-      border: 1px solid var(--glass-border);
-      border-radius: 6px;
-      color: #fff;
-      font-size: 0.9rem;
-    }
-    
-    .add-btn {
-      padding: 8px 15px;
-      background: var(--accent-gradient);
-      border: none;
-      border-radius: 6px;
-      color: #fff;
-      font-weight: bold;
-      cursor: pointer;
-      font-size: 0.9rem;
-      white-space: nowrap;
-    }
-    
-    .suggestions { margin-bottom: 20px; }
-    .suggestions h3 { font-size: 0.9rem; color: var(--text-secondary); margin: 0 0 10px; }
+    .add-source-section { border: 1px dashed var(--text-secondary); padding: 10px; margin-top: 20px; }
+    .category-tabs { display: flex; gap: 5px; margin-bottom: 10px; overflow-x: auto; }
+    .cat-tab { background: black; border: 1px solid var(--text-secondary); color: var(--text-secondary); cursor: pointer; padding: 2px 8px; font-size: 0.8rem; }
+    .cat-tab.active, .cat-tab:hover { background: var(--text-secondary); color: black; }
 
-    .category-tabs {
-      display: flex;
-      gap: 6px;
-      overflow-x: auto;
-      padding-bottom: 8px;
-      margin-bottom: 10px;
-      -webkit-overflow-scrolling: touch;
-    }
-    .cat-tab {
-      white-space: nowrap;
-      padding: 4px 10px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid var(--glass-border);
-      border-radius: 12px;
-      color: var(--text-secondary);
-      cursor: pointer;
-      font-size: 0.75rem;
-    }
-    .cat-tab.active {
-      background: var(--accent-color);
-      color: #fff;
-      border-color: var(--accent-color);
-    }
-    
-    .suggestion-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    
-    .suggestion-btn {
-      padding: 5px 10px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid var(--glass-border);
-      border-radius: 15px;
-      color: var(--text-primary);
-      cursor: pointer;
-      font-size: 0.8rem;
-      transition: background 0.2s;
-    }
-    .suggestion-btn:hover { background: rgba(255,255,255,0.1); }
-    
-    .or-divider {
-      text-align: center;
-      margin: 15px 0;
-      position: relative;
-    }
-    .or-divider span {
-      background: #1a1a2e; /* Approximate match to bg */
-      padding: 0 10px;
-      color: var(--text-secondary);
-      font-size: 0.7rem;
-      position: relative;
-      z-index: 1;
-    }
-    .or-divider:before {
-      content: "";
-      position: absolute;
-      left: 0; right: 0; top: 50%;
-      height: 1px;
-      background: var(--glass-border);
-    }
+    .suggestion-list { display: flex; flex-wrap: wrap; gap: 5px; }
+    .suggestion-btn { background: black; border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; font-size: 0.8rem; padding: 2px 6px; }
+    .suggestion-btn:hover { border-color: var(--text-primary); }
+
+    .or-divider { text-align: center; margin: 10px 0; border-bottom: 1px solid var(--border-color); line-height: 0.1em; color: var(--text-secondary); }
+    .or-divider span { background: black; padding: 0 10px; }
+
+    .form-grid { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .form-group input, .form-group select { background: black; border: 1px solid var(--text-secondary); color: var(--text-primary); padding: 5px; font-family: var(--font-mono); }
+    .add-btn { background: black; border: 1px solid var(--text-primary); color: var(--text-primary); cursor: pointer; padding: 5px 15px; font-weight: bold; }
+    .add-btn:hover { background: var(--text-primary); color: black; }
   `]
 })
 export class NewsSettingsComponent implements OnInit {

@@ -317,8 +317,8 @@ ${articles.slice(0, 40).map(a => `[${a.category}] ${a.title}`).join('\n')}`;
         const url = 'https://api.inworld.ai/tts/v1/voice';
         // Basic Auth: base64(apiKey:apiSecret)
         const credentials = Buffer.from(`${this.inworldApiKey}:${this.inworldSecret}`).toString('base64');
-        // Increased text limit for fuller narration (was 3000)
-        const textToSpeak = text.substring(0, 5000);
+        // Inworld API limit is 2000 characters
+        const textToSpeak = text.substring(0, 2000);
         // Voice selection: use personality voice if available, else random from legacy list
         let selectedVoice;
         if (personality && personality.voiceId) {

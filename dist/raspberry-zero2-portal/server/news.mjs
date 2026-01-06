@@ -1,46 +1,8 @@
-
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-
-// --- Types ---
-
-export interface NewsSource {
-    id: string;
-    name: string;
-    url: string;
-    type: 'news' | 'podcast';
-    category: string;
-    enabled: boolean;
-}
-
-export interface NewsItem {
-    title: string;
-    link: string;
-    snippet: string;
-    sourceName: string;
-    category: string;
-    enclosure?: { url: string, type: string };
-    pubDate: string;
-}
-
-export interface AudioTrack {
-    title: string;
-    url: string;
-    type: 'summary' | 'podcast';
-}
-
-export interface DailyBriefing {
-    date: string;
-    generatedAt: string;
-    summaryText: string;
-    audioPlaylist: AudioTrack[];
-    articles: NewsItem[];
-}
-
 // --- Hardcoded News Sources (70 total, 10 per category) ---
-
-const HARDCODED_SOURCES: NewsSource[] = [
+const HARDCODED_SOURCES = [
     // LOCAL (Hawaii-focused)
     { id: 'L1', name: 'Honolulu Star-Advertiser', url: 'https://www.staradvertiser.com/feed/', type: 'news', category: 'Local', enabled: true },
     { id: 'L2', name: 'KITV', url: 'https://www.kitv.com/feed/', type: 'news', category: 'Local', enabled: true },
@@ -52,7 +14,6 @@ const HARDCODED_SOURCES: NewsSource[] = [
     { id: 'L8', name: 'KHON2', url: 'https://www.khon2.com/feed/', type: 'news', category: 'Local', enabled: true },
     { id: 'L9', name: 'Civil Beat', url: 'https://www.civilbeat.org/feed/', type: 'news', category: 'Local', enabled: true },
     { id: 'L10', name: 'Pacific Business News', url: 'https://www.bizjournals.com/pacific/feed/rss', type: 'news', category: 'Local', enabled: true },
-
     // WORLD
     { id: 'W1', name: 'BBC World', url: 'http://feeds.bbci.co.uk/news/world/rss.xml', type: 'news', category: 'World', enabled: true },
     { id: 'W2', name: 'Reuters World', url: 'https://www.reutersagency.com/feed/?best-topics=world-news', type: 'news', category: 'World', enabled: true },
@@ -64,7 +25,6 @@ const HARDCODED_SOURCES: NewsSource[] = [
     { id: 'W8', name: 'NPR World', url: 'https://feeds.npr.org/1004/rss.xml', type: 'news', category: 'World', enabled: true },
     { id: 'W9', name: 'South China Morning Post', url: 'https://www.scmp.com/rss/91/feed', type: 'news', category: 'World', enabled: true },
     { id: 'W10', name: 'Japan Times', url: 'https://www.japantimes.co.jp/feed/', type: 'news', category: 'World', enabled: true },
-
     // US POLITICS
     { id: 'P1', name: 'Politico', url: 'https://www.politico.com/rss/politicopicks.xml', type: 'news', category: 'US Politics', enabled: true },
     { id: 'P2', name: 'The Hill', url: 'https://thehill.com/feed/', type: 'news', category: 'US Politics', enabled: true },
@@ -76,7 +36,6 @@ const HARDCODED_SOURCES: NewsSource[] = [
     { id: 'P8', name: 'Axios', url: 'https://api.axios.com/feed/', type: 'news', category: 'US Politics', enabled: true },
     { id: 'P9', name: 'The Intercept', url: 'https://theintercept.com/feed/?rss', type: 'news', category: 'US Politics', enabled: true },
     { id: 'P10', name: 'FiveThirtyEight', url: 'https://fivethirtyeight.com/politics/feed/', type: 'news', category: 'US Politics', enabled: true },
-
     // TECH
     { id: 'T1', name: 'Hacker News', url: 'https://news.ycombinator.com/rss', type: 'news', category: 'Tech', enabled: true },
     { id: 'T2', name: 'The Verge', url: 'https://www.theverge.com/rss/index.xml', type: 'news', category: 'Tech', enabled: true },
@@ -88,7 +47,6 @@ const HARDCODED_SOURCES: NewsSource[] = [
     { id: 'T8', name: 'Engadget', url: 'https://www.engadget.com/rss.xml', type: 'news', category: 'Tech', enabled: true },
     { id: 'T9', name: '9to5Mac', url: 'https://9to5mac.com/feed/', type: 'news', category: 'Tech', enabled: true },
     { id: 'T10', name: 'The Register', url: 'https://www.theregister.com/headlines.atom', type: 'news', category: 'Tech', enabled: true },
-
     // AI
     { id: 'A1', name: 'OpenAI Blog', url: 'https://openai.com/blog/rss.xml', type: 'news', category: 'AI', enabled: true },
     { id: 'A2', name: 'Google AI Blog', url: 'https://blog.google/technology/ai/rss/', type: 'news', category: 'AI', enabled: true },
@@ -100,7 +58,6 @@ const HARDCODED_SOURCES: NewsSource[] = [
     { id: 'A8', name: 'MIT Tech Review AI', url: 'https://www.technologyreview.com/topic/artificial-intelligence/feed', type: 'news', category: 'AI', enabled: true },
     { id: 'A9', name: 'VentureBeat AI', url: 'https://venturebeat.com/category/ai/feed/', type: 'news', category: 'AI', enabled: true },
     { id: 'A10', name: 'AI Weekly', url: 'https://aiweekly.co/issues.rss', type: 'news', category: 'AI', enabled: true },
-
     // FINANCE
     { id: 'F1', name: 'Bloomberg', url: 'https://feeds.bloomberg.com/markets/news.rss', type: 'news', category: 'Finance', enabled: true },
     { id: 'F2', name: 'CNBC', url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html', type: 'news', category: 'Finance', enabled: true },
@@ -112,7 +69,6 @@ const HARDCODED_SOURCES: NewsSource[] = [
     { id: 'F8', name: 'The Motley Fool', url: 'https://www.fool.com/feeds/index.aspx', type: 'news', category: 'Finance', enabled: true },
     { id: 'F9', name: "Barron's", url: 'https://www.barrons.com/rss', type: 'news', category: 'Finance', enabled: true },
     { id: 'F10', name: 'Investopedia', url: 'https://www.investopedia.com/feedbuilder/feed/getfeed?feedName=rss_headline', type: 'news', category: 'Finance', enabled: true },
-
     // SCIENCE
     { id: 'S1', name: 'NASA', url: 'https://www.nasa.gov/rss/dyn/breaking_news.rss', type: 'news', category: 'Science', enabled: true },
     { id: 'S2', name: 'Nature', url: 'https://www.nature.com/nature.rss', type: 'news', category: 'Science', enabled: true },
@@ -125,30 +81,24 @@ const HARDCODED_SOURCES: NewsSource[] = [
     { id: 'S9', name: 'Live Science', url: 'https://www.livescience.com/feeds/all', type: 'news', category: 'Science', enabled: true },
     { id: 'S10', name: 'MIT Tech Review', url: 'https://www.technologyreview.com/feed/', type: 'news', category: 'Science', enabled: true },
 ];
-
 // --- Simple RSS Parser (Zero Dependency) ---
-
-async function fetchAndParseRSS(url: string): Promise<any[]> {
+async function fetchAndParseRSS(url) {
     try {
         const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok)
+            throw new Error(`HTTP ${response.status}`);
         const text = await response.text();
-
-        const items: any[] = [];
+        const items = [];
         const itemRegex = /<item>([\s\S]*?)<\/item>/g;
         let match;
-
         while ((match = itemRegex.exec(text)) !== null) {
             const itemContent = match[1];
-
-            const getTag = (tag: string) => {
+            const getTag = (tag) => {
                 const r = new RegExp(`<${tag}.*?>(.*?)</${tag}>`, 's');
                 const m = r.exec(itemContent);
                 return m ? m[1].trim().replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1') : '';
             };
-
             const enclosureMatch = /<enclosure[^>]*url=["']([^"']*)[^>]*type=["']([^"']*)/i.exec(itemContent);
-
             items.push({
                 title: getTag('title'),
                 link: getTag('link'),
@@ -158,65 +108,54 @@ async function fetchAndParseRSS(url: string): Promise<any[]> {
             });
         }
         return items;
-    } catch (e) {
+    }
+    catch (e) {
         console.warn(`Failed to parse RSS from ${url}:`, e);
         return [];
     }
 }
-
 // --- Service ---
-
 export class NewsService {
-    private dataDir: string;
-    private briefingsDir: string;
-    private gemini: GoogleGenerativeAI;
-    private elevenLabsApiKey: string | undefined;
-    private inworldApiKey: string | undefined;
-    private inworldSecret: string | undefined;
-
-    constructor(
-        dataDir: string,
-        geminiApiKey: string,
-        elevenLabsApiKey?: string,
-        inworldApiKey?: string,
-        inworldSecret?: string
-    ) {
+    dataDir;
+    briefingsDir;
+    gemini;
+    elevenLabsApiKey;
+    inworldApiKey;
+    inworldSecret;
+    constructor(dataDir, geminiApiKey, elevenLabsApiKey, inworldApiKey, inworldSecret) {
         this.dataDir = dataDir;
         this.briefingsDir = join(dataDir, 'briefings');
         this.gemini = new GoogleGenerativeAI(geminiApiKey);
         this.elevenLabsApiKey = elevenLabsApiKey;
         this.inworldApiKey = inworldApiKey;
         this.inworldSecret = inworldSecret;
-
-        if (!existsSync(this.dataDir)) mkdirSync(this.dataDir, { recursive: true });
-        if (!existsSync(this.briefingsDir)) mkdirSync(this.briefingsDir, { recursive: true });
+        if (!existsSync(this.dataDir))
+            mkdirSync(this.dataDir, { recursive: true });
+        if (!existsSync(this.briefingsDir))
+            mkdirSync(this.briefingsDir, { recursive: true });
     }
-
-    getSources(): NewsSource[] {
+    getSources() {
         return HARDCODED_SOURCES;
     }
-
-    getBriefing(date: string): DailyBriefing | null {
+    getBriefing(date) {
         const file = join(this.briefingsDir, `${date}.json`);
         if (existsSync(file)) {
             return JSON.parse(readFileSync(file, 'utf8'));
         }
         return null;
     }
-
-    async generateDailyBriefing(force = false): Promise<DailyBriefing> {
+    async generateDailyBriefing(force = false) {
         const today = new Date().toISOString().split('T')[0];
         const existing = this.getBriefing(today);
-        if (existing && !force) return existing;
-
+        if (existing && !force)
+            return existing;
         const sources = this.getSources().filter(s => s.enabled);
-        const articles: NewsItem[] = [];
-        const podcastTracks: AudioTrack[] = [];
-
+        const articles = [];
+        const podcastTracks = [];
         // 1. Fetch (limit concurrent fetches for Pi performance)
         for (const source of sources) {
             const items = await fetchAndParseRSS(source.url);
-            items.slice(0, 2).forEach(item => { // Reduced to 2 per source for memory
+            items.slice(0, 2).forEach(item => {
                 let enclosure = undefined;
                 if (item.enclosure?.type?.startsWith('audio')) {
                     enclosure = { url: item.enclosure.url, type: item.enclosure.type };
@@ -228,7 +167,6 @@ export class NewsService {
                         });
                     }
                 }
-
                 articles.push({
                     title: item.title || '',
                     link: item.link || '',
@@ -240,15 +178,12 @@ export class NewsService {
                 });
             });
         }
-
         // 2. Summarize with Gemini
         let summaryText = "No summary generated.";
         let narrativeScript = "";
-
         if (articles.length > 5) {
             try {
                 const model = this.gemini.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
                 // Simplified prompt that requests plaintext, easier for LLM to follow
                 const prompt = `You are a news anchor. Create a daily briefing from the following headlines.
 
@@ -257,51 +192,50 @@ Respond with ONLY this exact JSON structure (no markdown, no extra text):
 
 Headlines:
 ${articles.slice(0, 30).map(a => `[${a.category}] ${a.title}`).join('\n')}`;
-
                 const result = await model.generateContent(prompt);
                 const responseText = result.response.text().trim();
-
                 // Robust JSON extraction
-                let content: { bulletPoints?: string; narrativeScript?: string } | null = null;
-
+                let content = null;
                 // Try direct parse first
                 try {
                     content = JSON.parse(responseText);
-                } catch {
+                }
+                catch {
                     // Try to find JSON object in response
                     const jsonStart = responseText.indexOf('{');
                     const jsonEnd = responseText.lastIndexOf('}');
                     if (jsonStart !== -1 && jsonEnd > jsonStart) {
                         try {
                             content = JSON.parse(responseText.substring(jsonStart, jsonEnd + 1));
-                        } catch {
+                        }
+                        catch {
                             console.log("JSON extraction failed, using plaintext fallback");
                         }
                     }
                 }
-
                 if (content && content.bulletPoints) {
                     summaryText = content.bulletPoints;
                     narrativeScript = content.narrativeScript || "";
-                } else {
+                }
+                else {
                     // Plaintext fallback - just use the raw response as summary
                     summaryText = responseText.length > 50 ? responseText : "Summary failed.";
                     narrativeScript = summaryText;
                 }
-            } catch (e) {
+            }
+            catch (e) {
                 console.error("Gemini Error:", e);
                 summaryText = "Error generating summary.";
             }
         }
-
         // 3. Audio with Inworld TTS (primary) or ElevenLabs (fallback)
         let summaryAudioUrl = '';
-
         if (this.inworldApiKey && this.inworldSecret && narrativeScript) {
             try {
                 console.log("Generating audio with Inworld TTS...");
                 summaryAudioUrl = await this.generateInworldAudio(narrativeScript);
-            } catch (e) {
+            }
+            catch (e) {
                 console.error("Inworld Audio generation failed:", e);
                 // Fallback to ElevenLabs if available
                 if (this.elevenLabsApiKey) {
@@ -309,44 +243,39 @@ ${articles.slice(0, 30).map(a => `[${a.category}] ${a.title}`).join('\n')}`;
                     summaryAudioUrl = await this.generateElevenLabsAudio(narrativeScript);
                 }
             }
-        } else if (this.elevenLabsApiKey && narrativeScript) {
+        }
+        else if (this.elevenLabsApiKey && narrativeScript) {
             try {
                 summaryAudioUrl = await this.generateElevenLabsAudio(narrativeScript);
-            } catch (e) {
+            }
+            catch (e) {
                 console.error("Audio generation failed", e);
             }
         }
-
         // 4. Playlist
-        const audioPlaylist: AudioTrack[] = [];
+        const audioPlaylist = [];
         if (summaryAudioUrl) {
             audioPlaylist.push({ title: 'Daily Summary', url: summaryAudioUrl, type: 'summary' });
         }
         audioPlaylist.push(...podcastTracks);
-
-        const briefing: DailyBriefing = {
+        const briefing = {
             date: today,
             generatedAt: new Date().toISOString(),
             summaryText,
             audioPlaylist,
             articles
         };
-
         writeFileSync(join(this.briefingsDir, `${today}.json`), JSON.stringify(briefing, null, 2));
         return briefing;
     }
-
-    private async generateInworldAudio(text: string): Promise<string> {
+    async generateInworldAudio(text) {
         // Inworld TTS REST API
         // Docs: https://docs.inworld.ai/docs/tutorial-integrations/tts/quickstart/
         const url = 'https://api.inworld.ai/tts/v1/voice';
-
         // Basic Auth: base64(apiKey:apiSecret)
         const credentials = Buffer.from(`${this.inworldApiKey}:${this.inworldSecret}`).toString('base64');
-
         // Limit text to avoid timeout (Inworld can handle long text but Pi is slow)
         const textToSpeak = text.substring(0, 3000);
-
         const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -355,40 +284,32 @@ ${articles.slice(0, 30).map(a => `[${a.category}] ${a.title}`).join('\n')}`;
             },
             body: JSON.stringify({
                 text: textToSpeak,
-                voiceId: 'Ashley',  // Default English voice
-                modelId: 'inworld-tts-1'  // Standard model (cost-efficient)
+                voiceId: 'Ashley', // Default English voice
+                modelId: 'inworld-tts-1' // Standard model (cost-efficient)
             })
         });
-
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Inworld TTS error ${response.status}: ${errorText}`);
         }
-
-        const result = await response.json() as { audioContent?: string };
-
+        const result = await response.json();
         if (!result.audioContent) {
             throw new Error('Inworld TTS response missing audioContent');
         }
-
         // Decode base64 audio to buffer
         const audioBuffer = Buffer.from(result.audioContent, 'base64');
-
         // Save audio file
         const filename = `inworld-summary-${Date.now()}.mp3`;
         const audioDir = join(this.dataDir, 'audio');
-        if (!existsSync(audioDir)) mkdirSync(audioDir, { recursive: true });
-
+        if (!existsSync(audioDir))
+            mkdirSync(audioDir, { recursive: true });
         writeFileSync(join(audioDir, filename), audioBuffer);
         console.log(`Inworld TTS audio saved: ${filename} (${audioBuffer.length} bytes)`);
-
         return `/api/audio/${filename}`;
     }
-
-    private async generateElevenLabsAudio(text: string): Promise<string> {
+    async generateElevenLabsAudio(text) {
         const voiceId = "21m00Tcm4TlvDq8ikWAM";
         const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
-
         const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -401,18 +322,15 @@ ${articles.slice(0, 30).map(a => `[${a.category}] ${a.title}`).join('\n')}`;
                 voice_settings: { stability: 0.5, similarity_boost: 0.5 }
             })
         });
-
-        if (!response.ok) throw new Error(`ElevenLabs error: ${response.statusText}`);
-
+        if (!response.ok)
+            throw new Error(`ElevenLabs error: ${response.statusText}`);
         const arrayBuffer = await response.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
         const filename = `summary-${Date.now()}.mp3`;
-
         const audioDir = join(this.dataDir, 'audio');
-        if (!existsSync(audioDir)) mkdirSync(audioDir, { recursive: true });
-
+        if (!existsSync(audioDir))
+            mkdirSync(audioDir, { recursive: true });
         writeFileSync(join(audioDir, filename), buffer);
-
         return `/api/audio/${filename}`;
     }
 }

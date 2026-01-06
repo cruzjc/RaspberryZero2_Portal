@@ -90,7 +90,7 @@ app.get('/api/config', (req, res) => {
     });
 });
 app.post('/api/config', (req, res) => {
-    const { geminiApiKey, elevenLabsApiKey, inworldApiKey, inworldSecret } = req.body;
+    const { geminiApiKey, elevenLabsApiKey, inworldApiKey, inworldSecret, inworldVoices } = req.body;
     if (geminiApiKey) {
         appConfig.geminiApiKey = geminiApiKey;
     }
@@ -102,6 +102,9 @@ app.post('/api/config', (req, res) => {
     }
     if (inworldSecret !== undefined) {
         appConfig.inworldSecret = inworldSecret || undefined;
+    }
+    if (inworldVoices !== undefined) {
+        appConfig.inworldVoices = inworldVoices || undefined;
     }
     // Save to file
     saveConfig(appConfig);

@@ -122,13 +122,18 @@ export class NewsService {
     elevenLabsApiKey;
     inworldApiKey;
     inworldSecret;
-    constructor(dataDir, geminiApiKey, elevenLabsApiKey, inworldApiKey, inworldSecret) {
+    inworldVoices;
+    constructor(dataDir, geminiApiKey, elevenLabsApiKey, inworldApiKey, inworldSecret, inworldVoicesStr) {
         this.dataDir = dataDir;
         this.briefingsDir = join(dataDir, 'briefings');
         this.gemini = new GoogleGenerativeAI(geminiApiKey);
         this.elevenLabsApiKey = elevenLabsApiKey;
         this.inworldApiKey = inworldApiKey;
         this.inworldSecret = inworldSecret;
+        // Parse comma-separated voice list, default to Ashley
+        this.inworldVoices = inworldVoicesStr
+            ? inworldVoicesStr.split(',').map(v => v.trim()).filter(v => v)
+            : ['Ashley'];
         if (!existsSync(this.dataDir))
             mkdirSync(this.dataDir, { recursive: true });
         if (!existsSync(this.briefingsDir))
@@ -276,6 +281,9 @@ ${articles.slice(0, 30).map(a => `[${a.category}] ${a.title}`).join('\n')}`;
         const credentials = Buffer.from(`${this.inworldApiKey}:${this.inworldSecret}`).toString('base64');
         // Limit text to avoid timeout (Inworld can handle long text but Pi is slow)
         const textToSpeak = text.substring(0, 3000);
+        // Random voice selection from configured list
+        const selectedVoice = this.inworldVoices[Math.floor(Math.random() * this.inworldVoices.length)];
+        console.log(`Inworld TTS using voice: ${selectedVoice} (from ${this.inworldVoices.length} options)`);
         const response = await fetch(url, {
             method: 'POST',
             headers: {
@@ -284,7 +292,7 @@ ${articles.slice(0, 30).map(a => `[${a.category}] ${a.title}`).join('\n')}`;
             },
             body: JSON.stringify({
                 text: textToSpeak,
-                voiceId: 'Ashley', // Default English voice
+                voiceId: selectedVoice,
                 modelId: 'inworld-tts-1' // Standard model (cost-efficient)
             })
         });

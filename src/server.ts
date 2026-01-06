@@ -18,6 +18,7 @@ interface AppConfig {
     elevenLabsApiKey?: string;
     inworldApiKey?: string;
     inworldSecret?: string;
+    inworldVoices?: string;
 }
 
 const resourcesFile = join(os.homedir(), '.portal-resources.json');
@@ -57,7 +58,8 @@ function initializeServices() {
             appConfig.geminiApiKey,
             appConfig.elevenLabsApiKey,
             appConfig.inworldApiKey,
-            appConfig.inworldSecret
+            appConfig.inworldSecret,
+            appConfig.inworldVoices
         );
         return true;
     }

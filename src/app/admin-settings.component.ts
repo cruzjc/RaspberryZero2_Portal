@@ -109,6 +109,15 @@ import { RouterModule } from '@angular/router';
               [class.configured]="configStatus.hasInworld"
             />
           </div>
+          <div class="voice-config" style="margin-top: 15px; border-top: 1px dashed var(--text-secondary); padding-top: 10px;">
+            <label style="color: var(--text-secondary); font-size: 0.8rem; display: block; margin-bottom: 5px;">Voice IDs (comma-separated, random pick on narrate):</label>
+            <textarea 
+              [(ngModel)]="inworldVoices" 
+              placeholder="Ashley, Brian, Emma, James"
+              style="width: 100%; background: black; border: 1px solid var(--text-secondary); color: var(--text-primary); padding: 8px; font-family: var(--font-mono); min-height: 60px; resize: vertical;"
+            ></textarea>
+            <p style="color: var(--text-secondary); font-size: 0.7rem; margin-top: 5px;">Available: Ashley, Brian, Emma, James, Madison, Miles, Ethan, Riley, Jenny, Tony</p>
+          </div>
         </div>
       </div>
 
@@ -174,6 +183,7 @@ export class AdminSettingsComponent implements OnInit {
   elevenLabsKey = '';
   inworldApiKey = '';
   inworldSecret = '';
+  inworldVoices = 'Ashley';
 
   showGemini = false;
   showElevenLabs = false;
@@ -217,6 +227,7 @@ export class AdminSettingsComponent implements OnInit {
     if (this.elevenLabsKey) payload.elevenLabsApiKey = this.elevenLabsKey;
     if (this.inworldApiKey) payload.inworldApiKey = this.inworldApiKey;
     if (this.inworldSecret) payload.inworldSecret = this.inworldSecret;
+    if (this.inworldVoices) payload.inworldVoices = this.inworldVoices;
 
     this.http.post<any>('/api/config', payload).subscribe({
       next: (data) => {

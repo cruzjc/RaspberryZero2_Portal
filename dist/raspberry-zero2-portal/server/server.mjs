@@ -37,7 +37,7 @@ if (process.env['ELEVENLABS_API_KEY'] && !appConfig.elevenLabsApiKey) {
 let newsService = null;
 function initializeServices() {
     if (appConfig.geminiApiKey) {
-        newsService = new NewsService(join(serverDistFolder, 'data'), appConfig.geminiApiKey, appConfig.elevenLabsApiKey, appConfig.inworldApiKey, appConfig.inworldSecret);
+        newsService = new NewsService(join(serverDistFolder, 'data'), appConfig.geminiApiKey, appConfig.elevenLabsApiKey, appConfig.inworldApiKey, appConfig.inworldSecret, appConfig.inworldVoices);
         return true;
     }
     return false;

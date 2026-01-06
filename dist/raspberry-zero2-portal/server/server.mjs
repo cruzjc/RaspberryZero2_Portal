@@ -37,7 +37,7 @@ if (process.env['ELEVENLABS_API_KEY'] && !appConfig.elevenLabsApiKey) {
 let newsService = null;
 function initializeServices() {
     if (appConfig.geminiApiKey) {
-        newsService = new NewsService(join(serverDistFolder, 'data'), appConfig.geminiApiKey, appConfig.elevenLabsApiKey, appConfig.inworldApiKey, appConfig.inworldSecret, appConfig.inworldVoices);
+        newsService = new NewsService(join(serverDistFolder, 'data'), appConfig.geminiApiKey, appConfig.elevenLabsApiKey, appConfig.inworldApiKey, appConfig.inworldSecret, appConfig.inworldVoices, appConfig.inworldVoicePersonalities, appConfig.categoryPriorities);
         return true;
     }
     return false;
@@ -90,7 +90,7 @@ app.get('/api/config', (req, res) => {
     });
 });
 app.post('/api/config', (req, res) => {
-    const { geminiApiKey, elevenLabsApiKey, inworldApiKey, inworldSecret, inworldVoices } = req.body;
+    const { geminiApiKey, elevenLabsApiKey, inworldApiKey, inworldSecret, inworldVoices, inworldVoicePersonalities, categoryPriorities } = req.body;
     if (geminiApiKey) {
         appConfig.geminiApiKey = geminiApiKey;
     }
@@ -105,6 +105,12 @@ app.post('/api/config', (req, res) => {
     }
     if (inworldVoices !== undefined) {
         appConfig.inworldVoices = inworldVoices || undefined;
+    }
+    if (inworldVoicePersonalities !== undefined) {
+        appConfig.inworldVoicePersonalities = inworldVoicePersonalities || undefined;
+    }
+    if (categoryPriorities !== undefined) {
+        appConfig.categoryPriorities = categoryPriorities || undefined;
     }
     // Save to file
     saveConfig(appConfig);

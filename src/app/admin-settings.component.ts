@@ -110,13 +110,38 @@ import { RouterModule } from '@angular/router';
             />
           </div>
           <div class="voice-config" style="margin-top: 15px; border-top: 1px dashed var(--text-secondary); padding-top: 10px;">
-            <label style="color: var(--text-secondary); font-size: 0.8rem; display: block; margin-bottom: 5px;">Voice IDs (comma-separated, random pick on narrate):</label>
+            <label style="color: var(--text-secondary); font-size: 0.8rem; display: block; margin-bottom: 5px;">Voice IDs (legacy, comma-separated):</label>
             <textarea 
               [(ngModel)]="inworldVoices" 
-              placeholder="Ashley, Brian, Emma, James"
+              placeholder="default-w5tqexcshinf-_u9dgvlow__lappland_the_decadenza, default-w5tqexcshinf-_u9dgvlow__bagpipe"
+              style="width: 100%; background: black; border: 1px solid var(--text-secondary); color: var(--text-primary); padding: 8px; font-family: var(--font-mono); min-height: 40px; resize: vertical;"
+            ></textarea>
+          </div>
+          <div class="personality-config" style="margin-top: 15px; border-top: 1px dashed var(--text-secondary); padding-top: 10px;">
+            <label style="color: var(--text-highlight); font-size: 0.9rem; display: block; margin-bottom: 5px;">🎭 Voice Personalities (JSON):</label>
+            <textarea 
+              [(ngModel)]="voicePersonalitiesJson" 
+              placeholder='[{"voiceId": "lappland...", "name": "Lappland", "personality": "You are Lappland, a chaotic news anchor..."}]'
+              style="width: 100%; background: black; border: 1px solid var(--text-secondary); color: var(--text-primary); padding: 8px; font-family: var(--font-mono); min-height: 80px; resize: vertical;"
+            ></textarea>
+            <p style="color: var(--text-secondary); font-size: 0.7rem; margin-top: 5px;">Each personality has voiceId, name, and personality prompt for Gemini summarization.</p>
+          </div>
+        </div>
+
+        <!-- Category Priorities -->
+        <div class="config-card glass-panel">
+          <div class="card-header">
+            <h2>📰 Category Priorities</h2>
+          </div>
+          <p class="description">
+            Order determines which categories appear first in summaries. Comma-separated.
+          </p>
+          <div class="input-group">
+            <textarea 
+              [(ngModel)]="categoryPrioritiesStr" 
+              placeholder="Breaking News, AI, Tech, Local, World, Business, Science, Finance, Politics, Health"
               style="width: 100%; background: black; border: 1px solid var(--text-secondary); color: var(--text-primary); padding: 8px; font-family: var(--font-mono); min-height: 60px; resize: vertical;"
             ></textarea>
-            <p style="color: var(--text-secondary); font-size: 0.7rem; margin-top: 5px;">Available: Ashley, Brian, Emma, James, Madison, Miles, Ethan, Riley, Jenny, Tony</p>
           </div>
         </div>
       </div>
@@ -183,7 +208,9 @@ export class AdminSettingsComponent implements OnInit {
   elevenLabsKey = '';
   inworldApiKey = '';
   inworldSecret = '';
-  inworldVoices = 'Ashley';
+  inworldVoices = '';
+  voicePersonalitiesJson = '';
+  categoryPrioritiesStr = 'Breaking News, AI, Tech, Local, World, Business, Science, Finance, Politics, Health';
 
   showGemini = false;
   showElevenLabs = false;
@@ -228,6 +255,22 @@ export class AdminSettingsComponent implements OnInit {
     if (this.inworldApiKey) payload.inworldApiKey = this.inworldApiKey;
     if (this.inworldSecret) payload.inworldSecret = this.inworldSecret;
     if (this.inworldVoices) payload.inworldVoices = this.inworldVoices;
+
+    // Parse voice personalities JSON
+    if (this.voicePersonalitiesJson.trim()) {
+      try {
+        payload.inworldVoicePersonalities = JSON.parse(this.voicePersonalitiesJson);
+      } catch (e) {
+        alert('Invalid Voice Personalities JSON. Please check the format.');
+        this.saving = false;
+        return;
+      }
+    }
+
+    // Parse category priorities
+    if (this.categoryPrioritiesStr.trim()) {
+      payload.categoryPriorities = this.categoryPrioritiesStr.split(',').map(s => s.trim()).filter(s => s);
+    }
 
     this.http.post<any>('/api/config', payload).subscribe({
       next: (data) => {

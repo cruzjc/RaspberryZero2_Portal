@@ -1,8 +1,14 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-// --- Hardcoded News Sources (70 total, 10 per category) ---
+// --- Hardcoded News Sources (80 total, Breaking News + 10 per category) ---
 const HARDCODED_SOURCES = [
+    // BREAKING NEWS (urgent/real-time feeds)
+    { id: 'BN1', name: 'AP Breaking News', url: 'https://apnews.com/rss/topnews', type: 'news', category: 'Breaking News', enabled: true },
+    { id: 'BN2', name: 'Reuters Top News', url: 'https://www.reutersagency.com/feed/?best-topics=top-news&post_type=best', type: 'news', category: 'Breaking News', enabled: true },
+    { id: 'BN3', name: 'BBC Breaking', url: 'https://feeds.bbci.co.uk/news/rss.xml', type: 'news', category: 'Breaking News', enabled: true },
+    { id: 'BN4', name: 'NPR Breaking', url: 'https://feeds.npr.org/1001/rss.xml', type: 'news', category: 'Breaking News', enabled: true },
+    { id: 'BN5', name: 'Google News Top', url: 'https://news.google.com/rss', type: 'news', category: 'Breaking News', enabled: true },
     // LOCAL (Hawaii-focused)
     { id: 'L1', name: 'Honolulu Star-Advertiser', url: 'https://www.staradvertiser.com/feed/', type: 'news', category: 'Local', enabled: true },
     { id: 'L2', name: 'KITV', url: 'https://www.kitv.com/feed/', type: 'news', category: 'Local', enabled: true },
@@ -114,7 +120,10 @@ async function fetchAndParseRSS(url) {
         return [];
     }
 }
-// --- Service ---
+const DEFAULT_CATEGORY_PRIORITIES = [
+    'Breaking News', 'AI', 'Tech', 'Local', 'World',
+    'Business', 'Science', 'Finance', 'Politics', 'Health'
+];
 export class NewsService {
     dataDir;
     briefingsDir;
@@ -123,17 +132,23 @@ export class NewsService {
     inworldApiKey;
     inworldSecret;
     inworldVoices;
-    constructor(dataDir, geminiApiKey, elevenLabsApiKey, inworldApiKey, inworldSecret, inworldVoicesStr) {
+    voicePersonalities;
+    categoryPriorities;
+    constructor(dataDir, geminiApiKey, elevenLabsApiKey, inworldApiKey, inworldSecret, inworldVoicesStr, voicePersonalities, categoryPriorities) {
         this.dataDir = dataDir;
         this.briefingsDir = join(dataDir, 'briefings');
         this.gemini = new GoogleGenerativeAI(geminiApiKey);
         this.elevenLabsApiKey = elevenLabsApiKey;
         this.inworldApiKey = inworldApiKey;
         this.inworldSecret = inworldSecret;
-        // Parse comma-separated voice list, default to Ashley
+        // Parse comma-separated voice list (legacy), default to Ashley
         this.inworldVoices = inworldVoicesStr
             ? inworldVoicesStr.split(',').map(v => v.trim()).filter(v => v)
             : ['Ashley'];
+        // Voice personalities with prompts
+        this.voicePersonalities = voicePersonalities || [];
+        // Category priorities
+        this.categoryPriorities = categoryPriorities || DEFAULT_CATEGORY_PRIORITIES;
         if (!existsSync(this.dataDir))
             mkdirSync(this.dataDir, { recursive: true });
         if (!existsSync(this.briefingsDir))
@@ -183,20 +198,42 @@ export class NewsService {
                 });
             });
         }
-        // 2. Summarize with Gemini
+        // 2. Sort articles by category priority
+        articles.sort((a, b) => {
+            const priorityA = this.categoryPriorities.indexOf(a.category);
+            const priorityB = this.categoryPriorities.indexOf(b.category);
+            // Items not in priority list go to end
+            const orderA = priorityA === -1 ? 999 : priorityA;
+            const orderB = priorityB === -1 ? 999 : priorityB;
+            return orderA - orderB;
+        });
+        console.log(`Sorted ${articles.length} articles by category priority: ${this.categoryPriorities.slice(0, 3).join(', ')}...`);
+        // 3. Select random voice personality (if configured)
+        let selectedPersonality = null;
+        if (this.voicePersonalities.length > 0) {
+            selectedPersonality = this.voicePersonalities[Math.floor(Math.random() * this.voicePersonalities.length)];
+            console.log(`Using personality: ${selectedPersonality.name}`);
+        }
+        // 4. Summarize with Gemini
         let summaryText = "No summary generated.";
         let narrativeScript = "";
         if (articles.length > 5) {
             try {
                 const model = this.gemini.getGenerativeModel({ model: 'gemini-2.0-flash' });
-                // Simplified prompt that requests plaintext, easier for LLM to follow
-                const prompt = `You are a news anchor. Create a daily briefing from the following headlines.
+                // Build personality instruction
+                const personalityInstruction = selectedPersonality
+                    ? `PERSONALITY: ${selectedPersonality.personality}\n\nPresent the news in this character's style and voice.\n\n`
+                    : '';
+                // Prompt with optional personality injection
+                const prompt = `${personalityInstruction}You are a news anchor. Create a comprehensive daily briefing from the following headlines.
+
+IMPORTANT: Create a COMPLETE narrative script that covers ALL the major headlines. The script should be 2-3 minutes when read aloud (about 300-500 words).
 
 Respond with ONLY this exact JSON structure (no markdown, no extra text):
-{"bulletPoints": "- Category: Headline summary\\n- Category: Another headline", "narrativeScript": "Good morning. Here's what's happening today. First in local news..."}
+{"bulletPoints": "- Category: Headline summary\\n- Category: Another headline", "narrativeScript": "Good morning. Here's what's happening today. [Complete narrative covering all major stories]..."}
 
-Headlines:
-${articles.slice(0, 30).map(a => `[${a.category}] ${a.title}`).join('\n')}`;
+Headlines (sorted by priority):
+${articles.slice(0, 40).map(a => `[${a.category}] ${a.title}`).join('\n')}`;
                 const result = await model.generateContent(prompt);
                 const responseText = result.response.text().trim();
                 // Robust JSON extraction
@@ -233,12 +270,13 @@ ${articles.slice(0, 30).map(a => `[${a.category}] ${a.title}`).join('\n')}`;
                 summaryText = "Error generating summary.";
             }
         }
-        // 3. Audio with Inworld TTS (primary) or ElevenLabs (fallback)
+        // 5. Audio with Inworld TTS (primary) or ElevenLabs (fallback)
         let summaryAudioUrl = '';
         if (this.inworldApiKey && this.inworldSecret && narrativeScript) {
             try {
                 console.log("Generating audio with Inworld TTS...");
-                summaryAudioUrl = await this.generateInworldAudio(narrativeScript);
+                // Pass selected personality for voice matching
+                summaryAudioUrl = await this.generateInworldAudio(narrativeScript, selectedPersonality);
             }
             catch (e) {
                 console.error("Inworld Audio generation failed:", e);
@@ -273,17 +311,24 @@ ${articles.slice(0, 30).map(a => `[${a.category}] ${a.title}`).join('\n')}`;
         writeFileSync(join(this.briefingsDir, `${today}.json`), JSON.stringify(briefing, null, 2));
         return briefing;
     }
-    async generateInworldAudio(text) {
+    async generateInworldAudio(text, personality) {
         // Inworld TTS REST API
         // Docs: https://docs.inworld.ai/docs/tutorial-integrations/tts/quickstart/
         const url = 'https://api.inworld.ai/tts/v1/voice';
         // Basic Auth: base64(apiKey:apiSecret)
         const credentials = Buffer.from(`${this.inworldApiKey}:${this.inworldSecret}`).toString('base64');
-        // Limit text to avoid timeout (Inworld can handle long text but Pi is slow)
-        const textToSpeak = text.substring(0, 3000);
-        // Random voice selection from configured list
-        const selectedVoice = this.inworldVoices[Math.floor(Math.random() * this.inworldVoices.length)];
-        console.log(`Inworld TTS using voice: ${selectedVoice} (from ${this.inworldVoices.length} options)`);
+        // Increased text limit for fuller narration (was 3000)
+        const textToSpeak = text.substring(0, 5000);
+        // Voice selection: use personality voice if available, else random from legacy list
+        let selectedVoice;
+        if (personality && personality.voiceId) {
+            selectedVoice = personality.voiceId;
+            console.log(`Inworld TTS using personality voice: ${personality.name} (${selectedVoice})`);
+        }
+        else {
+            selectedVoice = this.inworldVoices[Math.floor(Math.random() * this.inworldVoices.length)];
+            console.log(`Inworld TTS using random voice: ${selectedVoice} (from ${this.inworldVoices.length} options)`);
+        }
         const response = await fetch(url, {
             method: 'POST',
             headers: {

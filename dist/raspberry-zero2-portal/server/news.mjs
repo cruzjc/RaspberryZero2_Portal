@@ -235,34 +235,75 @@ Respond with ONLY this exact JSON structure (no markdown, no extra text):
 Headlines (sorted by priority):
 ${articles.slice(0, 40).map(a => `[${a.category}] ${a.title}`).join('\n')}`;
                 const result = await model.generateContent(prompt);
-                const responseText = result.response.text().trim();
+                let responseText = result.response.text().trim();
+                // Strip markdown code blocks if present (```json ... ```)
+                if (responseText.startsWith('```')) {
+                    responseText = responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
+                }
                 // Robust JSON extraction
                 let content = null;
                 // Try direct parse first
                 try {
                     content = JSON.parse(responseText);
+                    console.log("JSON parsed successfully");
                 }
-                catch {
+                catch (e) {
+                    console.log("Direct JSON parse failed:", e.message?.substring(0, 100));
                     // Try to find JSON object in response
                     const jsonStart = responseText.indexOf('{');
                     const jsonEnd = responseText.lastIndexOf('}');
                     if (jsonStart !== -1 && jsonEnd > jsonStart) {
                         try {
                             content = JSON.parse(responseText.substring(jsonStart, jsonEnd + 1));
+                            console.log("JSON extracted and parsed successfully");
                         }
-                        catch {
-                            console.log("JSON extraction failed, using plaintext fallback");
+                        catch (e2) {
+                            console.log("JSON extraction also failed:", e2.message?.substring(0, 100));
                         }
                     }
                 }
                 if (content && content.bulletPoints) {
                     summaryText = content.bulletPoints;
                     narrativeScript = content.narrativeScript || "";
+                    console.log(`Narrative length: ${narrativeScript.length} chars`);
                 }
                 else {
-                    // Plaintext fallback - just use the raw response as summary
-                    summaryText = responseText.length > 50 ? responseText : "Summary failed.";
-                    narrativeScript = summaryText;
+                    // Plaintext fallback - try to extract narrative portion
+                    // Look for narrativeScript field in the raw JSON-like text
+                    const narrativeStartMatch = responseText.match(/"narrativeScript"\s*:\s*"/i);
+                    if (narrativeStartMatch) {
+                        const startIdx = responseText.indexOf(narrativeStartMatch[0]) + narrativeStartMatch[0].length;
+                        // Find the closing quote (handle escaped quotes)
+                        let endIdx = startIdx;
+                        let inEscape = false;
+                        for (let i = startIdx; i < responseText.length; i++) {
+                            if (inEscape) {
+                                inEscape = false;
+                                continue;
+                            }
+                            if (responseText[i] === '\\') {
+                                inEscape = true;
+                                continue;
+                            }
+                            if (responseText[i] === '"') {
+                                endIdx = i;
+                                break;
+                            }
+                        }
+                        if (endIdx > startIdx) {
+                            narrativeScript = responseText.substring(startIdx, endIdx)
+                                .replace(/\\n/g, ' ') // Replace escaped newlines
+                                .replace(/\\"/g, '"') // Unescape quotes
+                                .trim();
+                            console.log(`Extracted narrative from raw JSON: ${narrativeScript.length} chars`);
+                        }
+                    }
+                    summaryText = responseText.length > 50 ? responseText : "Summary generated.";
+                    // If narrative still empty, skip TTS for malformed response
+                    if (!narrativeScript || narrativeScript.length < 50) {
+                        console.log("No valid narrative found, skipping TTS");
+                        narrativeScript = "";
+                    }
                 }
             }
             catch (e) {
@@ -317,8 +358,6 @@ ${articles.slice(0, 40).map(a => `[${a.category}] ${a.title}`).join('\n')}`;
         const url = 'https://api.inworld.ai/tts/v1/voice';
         // Basic Auth: base64(apiKey:apiSecret)
         const credentials = Buffer.from(`${this.inworldApiKey}:${this.inworldSecret}`).toString('base64');
-        // Inworld API limit is 2000 characters
-        const textToSpeak = text.substring(0, 2000);
         // Voice selection: use personality voice if available, else random from legacy list
         let selectedVoice;
         if (personality && personality.voiceId) {
@@ -329,35 +368,65 @@ ${articles.slice(0, 40).map(a => `[${a.category}] ${a.title}`).join('\n')}`;
             selectedVoice = this.inworldVoices[Math.floor(Math.random() * this.inworldVoices.length)];
             console.log(`Inworld TTS using random voice: ${selectedVoice} (from ${this.inworldVoices.length} options)`);
         }
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Basic ${credentials}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                text: textToSpeak,
-                voiceId: selectedVoice,
-                modelId: 'inworld-tts-1' // Standard model (cost-efficient)
-            })
-        });
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Inworld TTS error ${response.status}: ${errorText}`);
+        // Split text into chunks of ~1800 chars (leaving room for safety margin)
+        // Try to split at sentence boundaries
+        const MAX_CHUNK = 1800;
+        const chunks = [];
+        let remaining = text;
+        while (remaining.length > 0) {
+            if (remaining.length <= MAX_CHUNK) {
+                chunks.push(remaining);
+                break;
+            }
+            // Find a good split point (sentence end) within the limit
+            let splitPoint = MAX_CHUNK;
+            const lastPeriod = remaining.lastIndexOf('.', MAX_CHUNK);
+            const lastExclaim = remaining.lastIndexOf('!', MAX_CHUNK);
+            const lastQuestion = remaining.lastIndexOf('?', MAX_CHUNK);
+            const bestSentenceEnd = Math.max(lastPeriod, lastExclaim, lastQuestion);
+            if (bestSentenceEnd > MAX_CHUNK * 0.5) {
+                splitPoint = bestSentenceEnd + 1; // Include the punctuation
+            }
+            chunks.push(remaining.substring(0, splitPoint).trim());
+            remaining = remaining.substring(splitPoint).trim();
         }
-        const result = await response.json();
-        if (!result.audioContent) {
-            throw new Error('Inworld TTS response missing audioContent');
+        console.log(`Inworld TTS: splitting into ${chunks.length} parts (total ${text.length} chars)`);
+        // Generate audio for each chunk
+        const audioBuffers = [];
+        for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
+            console.log(`Generating part ${i + 1}/${chunks.length} (${chunk.length} chars)...`);
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Basic ${credentials}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    text: chunk,
+                    voiceId: selectedVoice,
+                    modelId: 'inworld-tts-1'
+                })
+            });
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Inworld TTS error ${response.status}: ${errorText}`);
+            }
+            const result = await response.json();
+            if (!result.audioContent) {
+                throw new Error('Inworld TTS response missing audioContent');
+            }
+            audioBuffers.push(Buffer.from(result.audioContent, 'base64'));
         }
-        // Decode base64 audio to buffer
-        const audioBuffer = Buffer.from(result.audioContent, 'base64');
+        // Concatenate all audio buffers
+        const combinedAudio = Buffer.concat(audioBuffers);
         // Save audio file
         const filename = `inworld-summary-${Date.now()}.mp3`;
         const audioDir = join(this.dataDir, 'audio');
         if (!existsSync(audioDir))
             mkdirSync(audioDir, { recursive: true });
-        writeFileSync(join(audioDir, filename), audioBuffer);
-        console.log(`Inworld TTS audio saved: ${filename} (${audioBuffer.length} bytes)`);
+        writeFileSync(join(audioDir, filename), combinedAudio);
+        console.log(`Inworld TTS audio saved: ${filename} (${combinedAudio.length} bytes, ${chunks.length} parts)`);
         return `/api/audio/${filename}`;
     }
     async generateElevenLabsAudio(text) {

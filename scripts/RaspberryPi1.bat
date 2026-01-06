@@ -1,0 +1,2 @@
+ssh JeanclydeCruz@raspberrypi1
+pause

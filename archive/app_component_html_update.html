@@ -1,0 +1,101 @@
+
+<div class="dashboard" *ngIf="isDashboard">
+  <header>
+    <div class="header-info">
+      <h1>Dashboard</h1>
+      <div>Session State: {{ sessionActive ? "Active" : "Inactive" }}</div>
+      <div *ngIf="sessionActive">Session ID: {{ sessionId }}</div>
+
+      <div *ngIf="transcript.length">
+        <h3>Transcript</h3>
+        <pre>{{ transcript.join("\n") }}</pre>
+      </div>
+    </div>
+    <aside class="call-sidebar">
+      <button
+        class="call-button"
+        (click)="startCall()"
+        [disabled]="sessionActive"
+      >
+        Start AI Call
+      </button>
+      <button class="call-button" (click)="endCall()" [disabled]="!sessionActive">
+        End AI Call
+      </button>
+      <button
+        class="call-button"
+        (click)="updatePortal()"
+        [disabled]="sessionActive"
+      >
+        Update Portal
+      </button>
+      <button
+        class="call-button"
+        (click)="deployPortal()"
+        [disabled]="sessionActive"
+      >
+        Deploy Portal
+      </button>
+    </aside>
+  </header>
+  <main class="widgets">
+    
+    <!-- News Widget -->
+    <app-news-widget></app-news-widget>
+
+    <section class="widget calendar">
+      <h2>Calendar</h2>
+      <p>Google Calendar integration placeholder</p>
+    </section>
+    <section class="widget datetime">
+      <h2>Date &amp; Time</h2>
+      <p>
+        {{ currentDate | date: "fullDate" }}
+        {{ currentDate | date: "shortTime" }}
+      </p>
+    </section>
+    <section class="widget agent-status">
+      <h2>AI Agent Status</h2>
+      <p>Status information will appear here</p>
+    </section>
+    <section class="widget agent-history">
+      <h2>AI Agent History</h2>
+      <p>Recent interactions will be listed here</p>
+    </section>
+    <section class="widget system-events">
+      <h2>System Events</h2>
+      <p>Logs will show up here</p>
+    </section>
+    <section class="widget links">
+      <h2>Shortcuts</h2>
+      <ul>
+        <li><a href="https://github.com/cruzjc" target="_blank">GitHub</a></li>
+        <li><a href="https://cruzjc.github.io/" target="_blank">Website</a></li>
+        <li><a href="https://chatgpt.com/codex" target="_blank">ChatGPT Codex</a></li>
+        <li>
+          <a href="https://app.netlify.com/teams/cruzjc/projects" target="_blank"
+            >Netlify Projects</a
+          >
+        </li>
+      </ul>
+    </section>
+    <section class="widget wallpaper">
+      <h2>Wallpaper</h2>
+      <p>Wallpaper controls go here</p>
+    </section>
+    <section class="widget resources">
+      <h2>
+        Resources
+        <button class="call-button" (click)="addResource()">Add</button>
+      </h2>
+      <ul>
+        <li *ngFor="let r of resources">
+          <span>{{ r.content }}</span>
+          <button class="call-button" (click)="deleteResource(r)">Delete</button>
+        </li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<router-outlet />

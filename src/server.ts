@@ -261,6 +261,84 @@ app.post('/api/services/:name/:action', (req, res) => {
     }
 });
 
+// --- Cron Management API ---
+const systemCronFile = '/etc/cron.d/portal-jobs';
+
+app.get('/api/cron/user', (req, res) => {
+    try {
+        const crontab = execSync('crontab -l 2>/dev/null || echo ""', { encoding: 'utf8' });
+        res.json({ crontab: crontab.trim() });
+    } catch (err: any) {
+        res.json({ crontab: '', error: err.message });
+    }
+});
+
+app.post('/api/cron/user', (req, res) => {
+    try {
+        const { crontab } = req.body;
+        if (typeof crontab !== 'string') {
+            res.status(400).json({ error: 'Invalid crontab content' });
+            return;
+        }
+        // Write to temp file and install
+        const tempFile = '/tmp/portal-crontab-' + Date.now();
+        writeFileSync(tempFile, crontab + '\n');
+        execSync(`crontab ${tempFile}`, { encoding: 'utf8' });
+        execSync(`rm ${tempFile}`);
+        res.json({ success: true, message: 'User crontab updated' });
+    } catch (err: any) {
+        console.error('Failed to update user crontab:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/cron/system', (req, res) => {
+    try {
+        if (existsSync(systemCronFile)) {
+            const crontab = readFileSync(systemCronFile, 'utf8');
+            res.json({ crontab: crontab.trim() });
+        } else {
+            res.json({ crontab: '' });
+        }
+    } catch (err: any) {
+        res.json({ crontab: '', error: err.message });
+    }
+});
+
+app.post('/api/cron/system', (req, res) => {
+    try {
+        const { crontab } = req.body;
+        if (typeof crontab !== 'string') {
+            res.status(400).json({ error: 'Invalid crontab content' });
+            return;
+        }
+        // Write via sudo
+        const tempFile = '/tmp/portal-system-cron-' + Date.now();
+        writeFileSync(tempFile, crontab + '\n');
+        execSync(`sudo mv ${tempFile} ${systemCronFile} && sudo chmod 644 ${systemCronFile}`, { encoding: 'utf8' });
+        res.json({ success: true, message: 'System crontab updated' });
+    } catch (err: any) {
+        console.error('Failed to update system crontab:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Trigger immediate news generation (for cron or manual use)
+app.post('/api/news/generate', async (req, res) => {
+    if (!newsService) {
+        res.status(503).json({ error: 'News service not initialized. Check API keys.' });
+        return;
+    }
+    try {
+        console.log('Triggering news generation...');
+        const briefing = await newsService.generateDailyBriefing(true); // force refresh
+        res.json({ success: true, date: briefing.date, articlesCount: briefing.articles.length });
+    } catch (err: any) {
+        console.error('News generation failed:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- Trading API ---
 const contingentOrdersFile = join(os.homedir(), 'projects/trader/contingent_orders.json');
 

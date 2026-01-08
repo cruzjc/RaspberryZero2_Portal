@@ -27,10 +27,24 @@ interface AppConfig {
     inworldVoices?: string;  // Legacy - comma separated
     inworldVoicePersonalities?: VoicePersonality[];
     categoryPriorities?: string[];
+    // Alpaca Trading Bot keys
+    alpacaKeyId?: string;
+    alpacaSecretKey?: string;
+    openaiApiKey?: string;  // For trader (separate from Gemini)
 }
 
 const resourcesFile = join(os.homedir(), '.portal-resources.json');
 const configFile = join(os.homedir(), '.portal-config.json');
+const traderEnvFile = join(os.homedir(), '.trader-config.env');
+
+// Write trader environment file for alpaca_ai_trader
+function writeTraderEnv(config: AppConfig) {
+    const lines: string[] = [];
+    if (config.alpacaKeyId) lines.push(`ALPACA_API_KEY_ID=${config.alpacaKeyId}`);
+    if (config.alpacaSecretKey) lines.push(`ALPACA_API_SECRET_KEY=${config.alpacaSecretKey}`);
+    if (config.openaiApiKey) lines.push(`OPENAI_API_KEY=${config.openaiApiKey}`);
+    writeFileSync(traderEnvFile, lines.join('\n') + '\n');
+}
 
 function readConfig(): AppConfig {
     try {
@@ -128,12 +142,14 @@ app.get('/api/config', (req, res) => {
         hasGemini: !!appConfig.geminiApiKey,
         hasElevenLabs: !!appConfig.elevenLabsApiKey,
         hasInworld: !!appConfig.inworldApiKey && !!appConfig.inworldSecret,
+        hasAlpaca: !!appConfig.alpacaKeyId && !!appConfig.alpacaSecretKey,
+        hasOpenAI: !!appConfig.openaiApiKey,
         servicesInitialized: !!newsService
     });
 });
 
 app.post('/api/config', (req, res) => {
-    const { geminiApiKey, elevenLabsApiKey, inworldApiKey, inworldSecret, inworldVoices, inworldVoicePersonalities, categoryPriorities } = req.body;
+    const { geminiApiKey, elevenLabsApiKey, inworldApiKey, inworldSecret, inworldVoices, inworldVoicePersonalities, categoryPriorities, alpacaKeyId, alpacaSecretKey, openaiApiKey } = req.body;
 
     if (geminiApiKey) {
         appConfig.geminiApiKey = geminiApiKey;
@@ -156,9 +172,24 @@ app.post('/api/config', (req, res) => {
     if (categoryPriorities !== undefined) {
         appConfig.categoryPriorities = categoryPriorities || undefined;
     }
+    // Alpaca Trading Bot keys
+    if (alpacaKeyId !== undefined) {
+        appConfig.alpacaKeyId = alpacaKeyId || undefined;
+    }
+    if (alpacaSecretKey !== undefined) {
+        appConfig.alpacaSecretKey = alpacaSecretKey || undefined;
+    }
+    if (openaiApiKey !== undefined) {
+        appConfig.openaiApiKey = openaiApiKey || undefined;
+    }
 
     // Save to file
     saveConfig(appConfig);
+
+    // Write trader environment file if Alpaca keys present
+    if (appConfig.alpacaKeyId || appConfig.alpacaSecretKey || appConfig.openaiApiKey) {
+        writeTraderEnv(appConfig);
+    }
 
     // Reinitialize services
     const initialized = initializeServices();
@@ -168,7 +199,9 @@ app.post('/api/config', (req, res) => {
         initialized,
         hasGemini: !!appConfig.geminiApiKey,
         hasElevenLabs: !!appConfig.elevenLabsApiKey,
-        hasInworld: !!appConfig.inworldApiKey && !!appConfig.inworldSecret
+        hasInworld: !!appConfig.inworldApiKey && !!appConfig.inworldSecret,
+        hasAlpaca: !!appConfig.alpacaKeyId && !!appConfig.alpacaSecretKey,
+        hasOpenAI: !!appConfig.openaiApiKey
     });
 });
 
@@ -177,6 +210,191 @@ app.delete('/api/config', (req, res) => {
     saveConfig(appConfig);
     newsService = null;
     res.json({ success: true, message: 'Configuration cleared' });
+});
+
+// --- Services Management API ---
+const MANAGED_SERVICES = ['portal', 'alpaca-trader'];
+
+function getServiceStatus(serviceName: string): { active: boolean; enabled: boolean; status: string } {
+    try {
+        const activeResult = execSync(`systemctl is-active ${serviceName} 2>/dev/null || true`, { encoding: 'utf8' }).trim();
+        const enabledResult = execSync(`systemctl is-enabled ${serviceName} 2>/dev/null || true`, { encoding: 'utf8' }).trim();
+        return {
+            active: activeResult === 'active',
+            enabled: enabledResult === 'enabled',
+            status: activeResult
+        };
+    } catch {
+        return { active: false, enabled: false, status: 'unknown' };
+    }
+}
+
+app.get('/api/services', (req, res) => {
+    const services = MANAGED_SERVICES.map(name => ({
+        name,
+        ...getServiceStatus(name)
+    }));
+    res.json(services);
+});
+
+app.post('/api/services/:name/:action', (req, res) => {
+    const { name, action } = req.params;
+
+    if (!MANAGED_SERVICES.includes(name)) {
+        res.status(400).json({ error: `Unknown service: ${name}` });
+        return;
+    }
+
+    const validActions = ['start', 'stop', 'restart', 'enable', 'disable'];
+    if (!validActions.includes(action)) {
+        res.status(400).json({ error: `Invalid action: ${action}` });
+        return;
+    }
+
+    try {
+        execSync(`sudo systemctl ${action} ${name}`, { encoding: 'utf8' });
+        const status = getServiceStatus(name);
+        res.json({ success: true, service: name, action, ...status });
+    } catch (err: any) {
+        console.error(`Service ${action} failed for ${name}:`, err);
+        res.status(500).json({ error: `Failed to ${action} ${name}`, details: err.message });
+    }
+});
+
+// --- Trading API ---
+const contingentOrdersFile = join(os.homedir(), 'projects/trader/contingent_orders.json');
+
+// Helper to make Alpaca API calls
+async function alpacaRequest(endpoint: string, method = 'GET', body?: any): Promise<any> {
+    // Read API keys from trader config
+    if (!existsSync(traderEnvFile)) {
+        throw new Error('Trading not configured');
+    }
+
+    const envContent = readFileSync(traderEnvFile, 'utf8');
+    const keyMatch = envContent.match(/ALPACA_API_KEY_ID=(.+)/);
+    const secretMatch = envContent.match(/ALPACA_API_SECRET_KEY=(.+)/);
+
+    if (!keyMatch || !secretMatch) {
+        throw new Error('Alpaca keys not found');
+    }
+
+    const isPaper = true; // Always use paper for safety
+    const baseUrl = isPaper ? 'https://paper-api.alpaca.markets' : 'https://api.alpaca.markets';
+
+    const response = await fetch(`${baseUrl}${endpoint}`, {
+        method,
+        headers: {
+            'APCA-API-KEY-ID': keyMatch[1].trim(),
+            'APCA-API-SECRET-KEY': secretMatch[1].trim(),
+            'Content-Type': 'application/json'
+        },
+        body: body ? JSON.stringify(body) : undefined
+    });
+
+    if (!response.ok) {
+        throw new Error(`Alpaca API error: ${response.status}`);
+    }
+    return response.json();
+}
+
+app.get('/api/trading/status', async (req, res) => {
+    try {
+        const [account, positions] = await Promise.all([
+            alpacaRequest('/v2/account'),
+            alpacaRequest('/v2/positions')
+        ]);
+
+        // Check if bot service is running
+        let botRunning = false;
+        try {
+            const status = execSync('systemctl is-active alpaca-trader 2>/dev/null || true', { encoding: 'utf8' }).trim();
+            botRunning = status === 'active';
+        } catch { }
+
+        res.json({
+            botRunning,
+            cash: parseFloat(account.cash),
+            equity: parseFloat(account.equity),
+            dayPL: parseFloat(account.equity) - parseFloat(account.last_equity),
+            positions: positions.map((p: any) => ({
+                symbol: p.symbol,
+                qty: parseFloat(p.qty),
+                current_price: parseFloat(p.current_price),
+                avg_entry_price: parseFloat(p.avg_entry_price),
+                unrealized_pl: parseFloat(p.unrealized_pl),
+                unrealized_plpc: parseFloat(p.unrealized_plpc)
+            })),
+            lastUpdate: new Date().toISOString()
+        });
+    } catch (err: any) {
+        console.error('Trading status error:', err);
+        res.status(503).json({ error: err.message });
+    }
+});
+
+app.get('/api/trading/contingent', (req, res) => {
+    try {
+        if (existsSync(contingentOrdersFile)) {
+            const orders = JSON.parse(readFileSync(contingentOrdersFile, 'utf8'));
+            res.json(orders);
+        } else {
+            res.json([]);
+        }
+    } catch (err) {
+        res.json([]);
+    }
+});
+
+app.post('/api/trading/contingent', (req, res) => {
+    try {
+        const { symbol, condition, value, action, notional, qty_pct } = req.body;
+
+        if (!symbol || !condition || !value || !action) {
+            res.status(400).json({ error: 'Missing required fields' });
+            return;
+        }
+
+        let orders: any[] = [];
+        if (existsSync(contingentOrdersFile)) {
+            orders = JSON.parse(readFileSync(contingentOrdersFile, 'utf8'));
+        }
+
+        orders.push({
+            symbol: symbol.toUpperCase(),
+            condition,
+            value: parseFloat(value),
+            action,
+            notional: notional ? parseFloat(notional) : 50,
+            qty_pct: qty_pct ? parseFloat(qty_pct) : 100,
+            created_at: new Date().toISOString()
+        });
+
+        writeFileSync(contingentOrdersFile, JSON.stringify(orders, null, 2));
+        res.json({ success: true, orders });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/trading/contingent/:index', (req, res) => {
+    try {
+        const index = parseInt(req.params.index);
+        if (existsSync(contingentOrdersFile)) {
+            let orders = JSON.parse(readFileSync(contingentOrdersFile, 'utf8'));
+            if (index >= 0 && index < orders.length) {
+                orders.splice(index, 1);
+                writeFileSync(contingentOrdersFile, JSON.stringify(orders, null, 2));
+                res.json({ success: true, orders });
+            } else {
+                res.status(404).json({ error: 'Order not found' });
+            }
+        } else {
+            res.status(404).json({ error: 'No orders found' });
+        }
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.post('/api/update-repo', (req, res) => {
@@ -322,8 +540,9 @@ app.get('**', (req, res, next) => {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const port = process.env['PORT'] || 4000;
-    app.listen(port, () => {
-        console.log(`Node Express server listening on http://localhost:${port}`);
+    const host = '0.0.0.0'; // Bind to all interfaces for external access
+    app.listen(Number(port), host, () => {
+        console.log(`Node Express server listening on http://${host}:${port}`);
     });
 }
 

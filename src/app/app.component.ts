@@ -5,6 +5,8 @@ import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { NewsWidgetComponent } from './news-widget.component';
 import { AdminSettingsComponent } from './admin-settings.component';
+import { ServicesManagementComponent } from './services-management.component';
+import { TradingStatusComponent } from './trading-status.component';
 
 interface Resource {
     id: string;
@@ -15,13 +17,13 @@ interface Resource {
 @Component({
     selector: 'app-root',
     standalone: true,
-    imports: [CommonModule, RouterOutlet, HttpClientModule, DatePipe, NewsWidgetComponent, AdminSettingsComponent],
+    imports: [CommonModule, RouterOutlet, HttpClientModule, DatePipe, NewsWidgetComponent, AdminSettingsComponent, ServicesManagementComponent, TradingStatusComponent],
     templateUrl: './app.component.html',
     styleUrl: './app.component.css',
 })
 
 export class AppComponent implements OnInit {
-    currentView: 'dashboard' | 'settings' = 'dashboard';
+    currentView: 'dashboard' | 'settings' | 'services' = 'dashboard';
     title = 'RaspberryZero2_Portal';
     currentDate = new Date();
 
@@ -190,6 +192,6 @@ export class AppComponent implements OnInit {
     }
 
     toggleSettings() {
-        this.currentView = this.currentView === 'dashboard' ? 'settings' : 'dashboard';
+        this.currentView = 'settings';
     }
 }

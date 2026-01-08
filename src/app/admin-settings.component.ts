@@ -144,6 +144,44 @@ import { RouterModule } from '@angular/router';
             ></textarea>
           </div>
         </div>
+
+        <!-- Alpaca Trading Bot -->
+        <div class="config-card glass-panel">
+          <div class="card-header">
+            <h2>📈 Alpaca Trading Bot</h2>
+            <span class="badge optional" [class.active]="configStatus.hasAlpaca">
+              {{ configStatus.hasAlpaca ? 'Configured' : 'Optional' }}
+            </span>
+          </div>
+          <p class="description">
+            API keys for the AI trading bot. Get keys from <a href="https://alpaca.markets/" target="_blank">Alpaca</a>.
+          </p>
+          <div class="input-group">
+            <input 
+              type="password" 
+              [(ngModel)]="alpacaKeyId" 
+              placeholder="Alpaca API Key ID (PK...)"
+              [class.configured]="configStatus.hasAlpaca"
+            />
+          </div>
+          <div class="input-group" style="margin-top: 10px;">
+            <input 
+              type="password" 
+              [(ngModel)]="alpacaSecretKey" 
+              placeholder="Alpaca Secret Key"
+              [class.configured]="configStatus.hasAlpaca"
+            />
+          </div>
+          <div class="input-group" style="margin-top: 15px; border-top: 1px dashed var(--text-secondary); padding-top: 10px;">
+            <input 
+              type="password" 
+              [(ngModel)]="openaiApiKey" 
+              placeholder="OpenAI API Key (for trader AI decisions)"
+              [class.configured]="configStatus.hasOpenAI"
+            />
+          </div>
+          <p style="color: var(--text-secondary); font-size: 0.7rem; margin-top: 5px;">Saved to ~/.trader-config.env for the trading service.</p>
+        </div>
       </div>
 
       <div class="actions">
@@ -211,6 +249,10 @@ export class AdminSettingsComponent implements OnInit {
   inworldVoices = '';
   voicePersonalitiesJson = '';
   categoryPrioritiesStr = 'Breaking News, AI, Tech, Local, World, Business, Science, Finance, Politics, Health';
+  // Alpaca Trading Bot
+  alpacaKeyId = '';
+  alpacaSecretKey = '';
+  openaiApiKey = '';
 
   showGemini = false;
   showElevenLabs = false;
@@ -220,6 +262,8 @@ export class AdminSettingsComponent implements OnInit {
     hasGemini: false,
     hasElevenLabs: false,
     hasInworld: false,
+    hasAlpaca: false,
+    hasOpenAI: false,
     servicesInitialized: false
   };
 
@@ -272,6 +316,11 @@ export class AdminSettingsComponent implements OnInit {
       payload.categoryPriorities = this.categoryPrioritiesStr.split(',').map(s => s.trim()).filter(s => s);
     }
 
+    // Alpaca Trading Bot keys
+    if (this.alpacaKeyId) payload.alpacaKeyId = this.alpacaKeyId;
+    if (this.alpacaSecretKey) payload.alpacaSecretKey = this.alpacaSecretKey;
+    if (this.openaiApiKey) payload.openaiApiKey = this.openaiApiKey;
+
     this.http.post<any>('/api/config', payload).subscribe({
       next: (data) => {
         this.saving = false;
@@ -280,6 +329,9 @@ export class AdminSettingsComponent implements OnInit {
         this.elevenLabsKey = '';
         this.inworldApiKey = '';
         this.inworldSecret = '';
+        this.alpacaKeyId = '';
+        this.alpacaSecretKey = '';
+        this.openaiApiKey = '';
 
         alert('✓ Configuration saved successfully!\n\nServices initialized: ' + (data.servicesInitialized ? 'Yes' : 'No'));
       },
@@ -300,10 +352,15 @@ export class AdminSettingsComponent implements OnInit {
         this.elevenLabsKey = '';
         this.inworldApiKey = '';
         this.inworldSecret = '';
+        this.alpacaKeyId = '';
+        this.alpacaSecretKey = '';
+        this.openaiApiKey = '';
         this.configStatus = {
           hasGemini: false,
           hasElevenLabs: false,
           hasInworld: false,
+          hasAlpaca: false,
+          hasOpenAI: false,
           servicesInitialized: false
         };
         alert('Configuration cleared');

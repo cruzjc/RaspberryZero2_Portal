@@ -22,6 +22,9 @@
       <button class="term-btn" [class.active]="currentView === 'settings'" (click)="toggleSettings()">
         [ CONFIG ]
       </button>
+      <button class="term-btn" [class.active]="currentView === 'services'" (click)="currentView = 'services'">
+        [ SERVICES ]
+      </button>
       <div class="nav-spacer"></div>
       <button class="term-btn danger" (click)="endCall()" *ngIf="sessionActive">
         [ TERMINATE_LINK ]
@@ -54,6 +57,12 @@
       <div class="terminal-section">
         <div class="section-title">-- NEWS_FEED --</div>
         <app-news-widget></app-news-widget>
+      </div>
+
+      <!-- Trading Status -->
+      <div class="terminal-section">
+        <div class="section-title">-- TRADING_STATUS --</div>
+        <app-trading-status></app-trading-status>
       </div>
 
       <!-- Notes / Resources -->
@@ -89,6 +98,11 @@
           <button class="term-btn" (click)="deployPortal()">[ RE-DEPLOY ]</button>
         </div>
       </div>
+    </div>
+
+    <!-- SERVICES VIEW -->
+    <div class="view-panel" *ngIf="currentView === 'services'">
+      <app-services-management></app-services-management>
     </div>
 
     <!-- GitHub Contribution Chart -->

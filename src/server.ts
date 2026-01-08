@@ -339,6 +339,127 @@ app.post('/api/news/generate', async (req, res) => {
     }
 });
 
+// --- Inworld Chat Assistant API ---
+interface ChatMessage {
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+}
+
+// Get system status for context injection
+function getSystemStatus(): string {
+    try {
+        const cpuInfo = execSync("top -bn1 | grep 'Cpu(s)' | awk '{print $2}'", { encoding: 'utf8' }).trim();
+        const memInfo = execSync("free -m | awk 'NR==2{printf \"%sMB / %sMB\", $3, $2}'", { encoding: 'utf8' }).trim();
+        const tempInfo = execSync("cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null | awk '{printf \"%.1fC\", $1/1000}'", { encoding: 'utf8' }).trim() || 'N/A';
+        const uptime = execSync("uptime -p", { encoding: 'utf8' }).trim();
+
+        // Get service statuses
+        const services = ['portal', 'alpaca-trader', 'caddy'];
+        const serviceStatus = services.map(s => {
+            try {
+                const active = execSync(`systemctl is-active ${s} 2>/dev/null`, { encoding: 'utf8' }).trim();
+                return `${s}: ${active}`;
+            } catch { return `${s}: inactive`; }
+        }).join(', ');
+
+        return `SYSTEM STATUS:
+- CPU Usage: ${cpuInfo}%
+- Memory: ${memInfo}
+- Temperature: ${tempInfo}
+- Uptime: ${uptime}
+- Services: ${serviceStatus}`;
+    } catch (e) {
+        return 'System status unavailable';
+    }
+}
+
+app.post('/api/chat/inworld', async (req, res) => {
+    const { message, history = [] } = req.body as { message: string; history?: ChatMessage[] };
+
+    if (!message) {
+        res.status(400).json({ error: 'Message is required' });
+        return;
+    }
+
+    // Use Gemini API (already configured for news)
+    if (!appConfig.geminiApiKey) {
+        res.status(503).json({ error: 'Gemini API not configured. Add key in Settings.' });
+        return;
+    }
+
+    try {
+        // Select persona from Inworld personality config (reuse for character consistency)
+        let persona = { name: 'ARIA', personality: 'You are ARIA, an AI assistant for the Raspberry Pi portal. You are friendly, helpful, and technically knowledgeable.' };
+        if (appConfig.inworldVoicePersonalities && appConfig.inworldVoicePersonalities.length > 0) {
+            const p = appConfig.inworldVoicePersonalities[0];
+            persona = { name: p.name, personality: p.personality };
+        }
+
+        // Get current system status
+        const systemStatus = getSystemStatus();
+
+        // Build conversation for Gemini
+        const systemPrompt = `${persona.personality}
+
+You are connected to a Raspberry Pi Zero 2 portal dashboard. You can provide information about the system status.
+
+${systemStatus}
+
+Current time: ${new Date().toLocaleString('en-US', { timeZone: 'Pacific/Honolulu' })} (Hawaii Time)
+
+Answer user questions helpfully while staying in character. Keep responses concise but informative. If asked about system status, use the information above.`;
+
+        // Format history for Gemini
+        const contents: { role: string; parts: { text: string }[] }[] = [];
+
+        // Add conversation history
+        for (const msg of history.slice(-10)) {
+            contents.push({
+                role: msg.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: msg.content }]
+            });
+        }
+
+        // Add current message
+        contents.push({
+            role: 'user',
+            parts: [{ text: message }]
+        });
+
+        // Call Gemini API
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${appConfig.geminiApiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents,
+                    systemInstruction: { parts: [{ text: systemPrompt }] }
+                })
+            }
+        );
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Gemini API error:', response.status, errorText);
+            res.status(response.status).json({ error: `Chat API error: ${response.status}` });
+            return;
+        }
+
+        const result = await response.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+        const reply = result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response from assistant.';
+
+        res.json({
+            reply,
+            persona: persona.name,
+            systemStatus: systemStatus.split('\n').slice(1).join(', ').substring(0, 100)
+        });
+    } catch (err: any) {
+        console.error('Chat error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- Trading API ---
 const contingentOrdersFile = join(os.homedir(), 'projects/trader/contingent_orders.json');
 

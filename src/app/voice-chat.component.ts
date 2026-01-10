@@ -1,12 +1,9 @@
-import { Component, EventEmitter, Output, OnInit, OnDestroy, Input } from '@angular/core';
+import { Component, EventEmitter, Output, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 
-interface VoiceSession {
-  wsUrl: string;
-  sessionId: string;
-  persona: string;
-}
+// Web Speech API types
+declare var webkitSpeechRecognition: any;
 
 @Component({
   selector: 'app-voice-chat',
@@ -30,8 +27,8 @@ interface VoiceSession {
           <div class="waveform">
             <div class="wave-bar" *ngFor="let bar of waveformBars" [style.height.%]="bar"></div>
           </div>
-          <div class="status-icon" [class.active]="listening">
-            {{ listening ? '🎤' : '🔇' }}
+          <div class="status-icon" [class.active]="listening" [class.speaking]="isSpeaking">
+            {{ isSpeaking ? '🔊' : (listening ? '🎤' : '🔇') }}
           </div>
         </div>
 
@@ -42,6 +39,10 @@ interface VoiceSession {
             </span>
             <span class="text">{{ line.text }}</span>
           </div>
+          <div class="transcript-line interim" *ngIf="interimTranscript">
+            <span class="speaker user">> YOU:</span>
+            <span class="text">{{ interimTranscript }}</span>
+          </div>
           <div class="transcript-line thinking" *ngIf="aiThinking">
             <span class="speaker">< {{ personaName.toUpperCase() }}:</span>
             <span class="text">...</span>
@@ -49,13 +50,16 @@ interface VoiceSession {
         </div>
 
         <div class="voice-controls">
-          <button class="mic-btn" [class.active]="listening" (click)="toggleMic()">
+          <button class="mic-btn" [class.active]="listening" (click)="toggleMic()" [disabled]="isSpeaking">
             {{ listening ? '[ MUTE ]' : '[ UNMUTE ]' }}
           </button>
           <button class="end-btn" (click)="endSession()">[ END SESSION ]</button>
         </div>
 
         <div class="error-msg" *ngIf="error">⚠ {{ error }}</div>
+        <div class="info-msg" *ngIf="!speechSupported && !error">
+          ℹ Speech Recognition not supported. Use Chrome.
+        </div>
       </div>
     </div>
   `,
@@ -69,7 +73,6 @@ interface VoiceSession {
       align-items: center;
       z-index: 1000;
     }
-
     .voice-modal {
       width: 90%;
       max-width: 500px;
@@ -79,7 +82,6 @@ interface VoiceSession {
       flex-direction: column;
       box-shadow: 0 0 40px rgba(255, 107, 107, 0.3);
     }
-
     .voice-header {
       display: flex;
       justify-content: space-between;
@@ -88,7 +90,6 @@ interface VoiceSession {
       border-bottom: 1px solid #333;
       background: #111;
     }
-
     .persona-info { display: flex; align-items: center; gap: 10px; }
     .persona-icon { font-size: 1.2rem; }
     .persona-name { color: #ff6b6b; font-weight: bold; text-transform: uppercase; }
@@ -100,106 +101,73 @@ interface VoiceSession {
     }
     .connection-status.connected { color: #00ff88; }
     .connection-status.listening { color: #ff6b6b; animation: pulse 1s infinite; }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
-
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     .close-btn {
-      background: transparent;
-      border: 1px solid #ff6b6b;
-      color: #ff6b6b;
+      background: none;
+      border: 1px solid #666;
+      color: #666;
       padding: 5px 10px;
       cursor: pointer;
       font-family: inherit;
     }
-    .close-btn:hover { background: #ff6b6b; color: black; }
-
+    .close-btn:hover { color: #ff6b6b; border-color: #ff6b6b; }
     .voice-visualizer {
-      padding: 30px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 15px;
-    }
-
-    .waveform {
+      padding: 20px;
       display: flex;
       align-items: center;
-      gap: 3px;
-      height: 60px;
+      justify-content: center;
+      gap: 20px;
+      min-height: 100px;
     }
-
+    .waveform { display: flex; align-items: center; gap: 3px; height: 60px; }
     .wave-bar {
       width: 4px;
-      background: linear-gradient(to top, #ff6b6b, #00ff88);
-      border-radius: 2px;
+      background: linear-gradient(to top, #ff6b6b, #ff8f8f);
       transition: height 0.1s ease;
+      min-height: 5%;
     }
-
-    .status-icon {
-      font-size: 3rem;
-      opacity: 0.5;
-    }
-    .status-icon.active {
-      opacity: 1;
-      animation: glow 1s infinite alternate;
-    }
-    @keyframes glow {
-      from { text-shadow: 0 0 10px #ff6b6b; }
-      to { text-shadow: 0 0 30px #ff6b6b; }
-    }
-
+    .status-icon { font-size: 3rem; opacity: 0.5; transition: all 0.3s ease; }
+    .status-icon.active { opacity: 1; animation: pulse 1s infinite; }
+    .status-icon.speaking { opacity: 1; color: #00ff88; }
     .transcript-area {
       flex: 1;
-      min-height: 100px;
-      max-height: 150px;
+      min-height: 150px;
+      max-height: 250px;
       overflow-y: auto;
       padding: 15px;
-      border-top: 1px solid #333;
-      border-bottom: 1px solid #333;
-      font-family: var(--font-mono, monospace);
-      font-size: 0.85rem;
+      background: #050505;
+      border-top: 1px solid #222;
+      border-bottom: 1px solid #222;
     }
-
-    .transcript-line { margin-bottom: 8px; }
-    .speaker { color: #666; margin-right: 8px; }
-    .speaker.user { color: #00ffff; }
-    .text { color: #ddd; }
-    .thinking .text { animation: blink 0.5s infinite; }
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0; }
-    }
-
-    .voice-controls {
-      display: flex;
-      gap: 10px;
-      padding: 15px;
-      justify-content: center;
-    }
-
+    .transcript-line { margin-bottom: 10px; line-height: 1.4; }
+    .speaker { color: #00ff88; font-weight: bold; margin-right: 8px; }
+    .speaker.user { color: #ff6b6b; }
+    .text { color: #ccc; }
+    .transcript-line.thinking .text { animation: blink 0.5s infinite; }
+    .transcript-line.interim .text { color: #666; font-style: italic; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .voice-controls { display: flex; gap: 10px; padding: 15px; }
     .mic-btn, .end-btn {
-      background: black;
-      border: 1px solid #666;
-      color: #ddd;
-      padding: 10px 20px;
-      cursor: pointer;
+      flex: 1;
+      padding: 12px;
+      border: 1px solid #ff6b6b;
+      background: transparent;
+      color: #ff6b6b;
       font-family: inherit;
-      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
     }
-    .mic-btn.active { border-color: #ff6b6b; color: #ff6b6b; }
-    .mic-btn:hover { background: #333; }
-    .end-btn { border-color: #ff6b6b; color: #ff6b6b; }
-    .end-btn:hover { background: #ff6b6b; color: black; }
-
-    .error-msg {
-      background: rgba(255, 100, 100, 0.2);
+    .mic-btn:hover, .end-btn:hover { background: #ff6b6b; color: black; }
+    .mic-btn.active { background: #ff6b6b; color: black; }
+    .mic-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .error-msg, .info-msg {
+      background: rgba(255, 0, 0, 0.1);
+      border-top: 1px solid #ff6b6b;
       color: #ff6b6b;
       padding: 10px 15px;
       font-size: 0.85rem;
     }
+    .info-msg { background: rgba(0, 150, 255, 0.1); border-color: #0096ff; color: #0096ff; }
   `]
 })
 export class VoiceChatComponent implements OnInit, OnDestroy {
@@ -209,20 +177,25 @@ export class VoiceChatComponent implements OnInit, OnDestroy {
   connected = false;
   listening = false;
   aiThinking = false;
+  isSpeaking = false;
   error = '';
+  interimTranscript = '';
   transcript: { speaker: 'user' | 'ai'; text: string }[] = [];
   waveformBars: number[] = new Array(20).fill(5);
+  speechSupported = false;
 
   private mediaStream?: MediaStream;
   private audioContext?: AudioContext;
   private analyser?: AnalyserNode;
   private animationFrame?: number;
-  private ws?: WebSocket;
+  private recognition?: any;
+  private conversationHistory: { role: string; content: string }[] = [];
 
   constructor(private http: HttpClient) { }
 
   get statusText(): string {
     if (this.error) return '◉ ERROR';
+    if (this.isSpeaking) return '◉ SPEAKING';
     if (this.listening) return '◉ LISTENING';
     if (this.connected) return '◉ CONNECTED';
     return '◉ CONNECTING...';
@@ -238,19 +211,22 @@ export class VoiceChatComponent implements OnInit, OnDestroy {
 
   private async initSession() {
     try {
-      // Get voice session from backend
-      const session = await this.http.get<VoiceSession>('/api/voice/session').toPromise();
+      // Check for Web Speech API support
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        this.speechSupported = true;
+      }
 
-      if (!session) {
-        this.error = 'Failed to initialize voice session';
+      // Get config to check if services are available
+      const config = await this.http.get<any>('/api/config').toPromise();
+
+      if (!config.hasGemini) {
+        this.error = 'Gemini API not configured. Add key in Settings.';
         return;
       }
 
-      this.personaName = session.persona || 'ARIA';
-
-      // Check if mediaDevices is supported (requires Secure Context: HTTPS or localhost)
+      // Check if mediaDevices is supported
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Microphone access requires a Secure Context (HTTPS or localhost). If testing on LAN, enable "Insecure origins treated as secure" in chrome://flags.');
+        throw new Error('Microphone access requires HTTPS or localhost.');
       }
 
       // Request microphone access
@@ -266,35 +242,179 @@ export class VoiceChatComponent implements OnInit, OnDestroy {
 
       this.startVisualization();
       this.connected = true;
-      this.listening = true;
 
-      // For now, simulate AI responses (full WebSocket integration would go here)
-      this.simulateWelcome();
+      // Initialize speech recognition
+      if (this.speechSupported) {
+        this.initSpeechRecognition();
+      }
+
+      // Welcome message
+      this.addAIMessage('Voice link established. Speak to interact.');
 
     } catch (err: any) {
       console.error('Voice init error:', err);
       if (err.name === 'NotAllowedError') {
-        this.error = 'Microphone access denied. Please enable microphone permissions.';
-      } else if (err.status === 503) {
-        this.error = err.error?.error || 'Inworld API not configured. Add keys in Settings.';
+        this.error = 'Microphone access denied. Enable permissions.';
       } else {
         this.error = err.message || 'Failed to initialize voice session';
       }
     }
   }
 
-  private simulateWelcome() {
-    // Simulate AI greeting since full Inworld WebSocket requires character setup
+  private initSpeechRecognition() {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    this.recognition = new SpeechRecognition();
+    this.recognition.continuous = true;
+    this.recognition.interimResults = true;
+    this.recognition.lang = 'en-US';
+
+    this.recognition.onresult = (event: any) => {
+      let finalTranscript = '';
+      let interim = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interim += transcript;
+        }
+      }
+
+      this.interimTranscript = interim;
+
+      if (finalTranscript.trim()) {
+        this.interimTranscript = '';
+        this.handleUserSpeech(finalTranscript.trim());
+      }
+    };
+
+    this.recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      if (event.error === 'not-allowed') {
+        this.error = 'Microphone access denied for speech recognition.';
+      }
+    };
+
+    this.recognition.onend = () => {
+      // Restart if still listening
+      if (this.listening && this.recognition) {
+        try {
+          this.recognition.start();
+        } catch (e) {
+          // Already started
+        }
+      }
+    };
+
+    // Start listening
+    this.startListening();
+  }
+
+  private startListening() {
+    if (this.recognition && !this.listening) {
+      try {
+        this.recognition.start();
+        this.listening = true;
+      } catch (e) {
+        console.error('Failed to start recognition:', e);
+      }
+    }
+  }
+
+  private stopListening() {
+    if (this.recognition && this.listening) {
+      try {
+        this.recognition.stop();
+        this.listening = false;
+        this.interimTranscript = '';
+      } catch (e) {
+        console.error('Failed to stop recognition:', e);
+      }
+    }
+  }
+
+  private async handleUserSpeech(text: string) {
+    // Add to transcript
+    this.transcript.push({ speaker: 'user', text });
+    this.scrollTranscript();
+
+    // Get AI response
+    this.aiThinking = true;
+
+    // Add to conversation history
+    this.conversationHistory.push({ role: 'user', content: text });
+
+    try {
+      const response = await this.http.post<any>('/api/chat/inworld', {
+        message: text,
+        history: this.conversationHistory.slice(-10)
+      }).toPromise();
+
+      this.aiThinking = false;
+
+      if (response?.reply) {
+        const aiText = response.reply;
+        this.addAIMessage(aiText);
+        this.conversationHistory.push({ role: 'assistant', content: aiText });
+        this.speakText(aiText);
+      }
+    } catch (err: any) {
+      console.error('Chat error:', err);
+      this.aiThinking = false;
+      this.addAIMessage('Sorry, I encountered an error. Please try again.');
+    }
+  }
+
+  private addAIMessage(text: string) {
+    this.transcript.push({ speaker: 'ai', text });
+    this.scrollTranscript();
+  }
+
+  private scrollTranscript() {
     setTimeout(() => {
-      this.aiThinking = true;
-      setTimeout(() => {
-        this.aiThinking = false;
-        this.transcript.push({
-          speaker: 'ai',
-          text: 'Voice link established. I can hear you. How may I assist you today?'
-        });
-      }, 1500);
-    }, 1000);
+      const area = document.querySelector('.transcript-area');
+      if (area) area.scrollTop = area.scrollHeight;
+    }, 50);
+  }
+
+  private speakText(text: string) {
+    if ('speechSynthesis' in window) {
+      // Stop listening while speaking to avoid feedback
+      this.stopListening();
+      this.isSpeaking = true;
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+
+      // Try to find a good voice
+      const voices = speechSynthesis.getVoices();
+      const preferredVoice = voices.find(v =>
+        v.lang.startsWith('en') && (v.name.includes('Female') || v.name.includes('Google'))
+      );
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+      }
+
+      utterance.onend = () => {
+        this.isSpeaking = false;
+        if (this.connected) {
+          this.startListening();
+        }
+      };
+
+      utterance.onerror = () => {
+        this.isSpeaking = false;
+        if (this.connected) {
+          this.startListening();
+        }
+      };
+
+      speechSynthesis.speak(utterance);
+    }
   }
 
   private startVisualization() {
@@ -307,7 +427,6 @@ export class VoiceChatComponent implements OnInit, OnDestroy {
 
       this.analyser.getByteFrequencyData(dataArray);
 
-      // Map frequency data to waveform bars
       this.waveformBars = this.waveformBars.map((_, i) => {
         const idx = Math.floor(i * dataArray.length / this.waveformBars.length);
         return Math.max(5, (dataArray[idx] / 255) * 100);
@@ -320,12 +439,18 @@ export class VoiceChatComponent implements OnInit, OnDestroy {
   }
 
   toggleMic() {
-    if (this.mediaStream) {
-      const audioTrack = this.mediaStream.getAudioTracks()[0];
-      if (audioTrack) {
-        audioTrack.enabled = !audioTrack.enabled;
-        this.listening = audioTrack.enabled;
+    if (this.isSpeaking) return;
+
+    if (this.listening) {
+      this.stopListening();
+      if (this.mediaStream) {
+        this.mediaStream.getAudioTracks().forEach(t => t.enabled = false);
       }
+    } else {
+      if (this.mediaStream) {
+        this.mediaStream.getAudioTracks().forEach(t => t.enabled = true);
+      }
+      this.startListening();
     }
   }
 
@@ -335,6 +460,10 @@ export class VoiceChatComponent implements OnInit, OnDestroy {
   }
 
   private cleanup() {
+    this.stopListening();
+    if (typeof speechSynthesis !== 'undefined' && speechSynthesis.speaking) {
+      speechSynthesis.cancel();
+    }
     if (this.animationFrame) {
       cancelAnimationFrame(this.animationFrame);
     }
@@ -343,9 +472,6 @@ export class VoiceChatComponent implements OnInit, OnDestroy {
     }
     if (this.audioContext) {
       this.audioContext.close();
-    }
-    if (this.ws) {
-      this.ws.close();
     }
   }
 }

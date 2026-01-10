@@ -8,6 +8,7 @@ import { AdminSettingsComponent } from './admin-settings.component';
 import { ServicesManagementComponent } from './services-management.component';
 import { TradingStatusComponent } from './trading-status.component';
 import { ChatAssistantComponent } from './chat-assistant.component';
+import { VoiceChatComponent } from './voice-chat.component';
 
 interface Resource {
     id: string;
@@ -18,7 +19,7 @@ interface Resource {
 @Component({
     selector: 'app-root',
     standalone: true,
-    imports: [CommonModule, RouterOutlet, HttpClientModule, DatePipe, NewsWidgetComponent, AdminSettingsComponent, ServicesManagementComponent, TradingStatusComponent, ChatAssistantComponent],
+    imports: [CommonModule, RouterOutlet, HttpClientModule, DatePipe, NewsWidgetComponent, AdminSettingsComponent, ServicesManagementComponent, TradingStatusComponent, ChatAssistantComponent, VoiceChatComponent],
     templateUrl: './app.component.html',
     styleUrl: './app.component.css',
 })
@@ -30,6 +31,7 @@ export class AppComponent implements OnInit {
 
     sessionActive = false;
     chatOpen = false;
+    voiceActive = false;
 
     resources: Resource[] = [];
 
@@ -100,6 +102,17 @@ export class AppComponent implements OnInit {
 
     endCall(): void {
         this.chatOpen = false;
+        this.sessionActive = false;
+    }
+
+    startVoice(): void {
+        if (!this.isBrowser) return;
+        this.voiceActive = true;
+        this.sessionActive = true;
+    }
+
+    endVoice(): void {
+        this.voiceActive = false;
         this.sessionActive = false;
     }
 

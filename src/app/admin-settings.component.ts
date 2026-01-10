@@ -37,6 +37,10 @@ import { RouterModule } from '@angular/router';
             Required for AI news summarization (gemini-2.0-flash).
             Get your key from <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.
           </p>
+          <div class="current-key" *ngIf="configStatus.maskedKeys?.gemini">
+            <span class="label">Current:</span>
+            <code>{{ configStatus.maskedKeys?.gemini }}</code>
+          </div>
           <div class="input-group">
             <input 
               type="password" 
@@ -65,6 +69,10 @@ import { RouterModule } from '@angular/router';
             For AI voice chatbot (ESTABLISH_LINK button).
             Get your key from <a href="https://elevenlabs.io/" target="_blank">ElevenLabs</a>.
           </p>
+          <div class="current-key" *ngIf="configStatus.maskedKeys?.elevenLabs">
+            <span class="label">Current:</span>
+            <code>{{ configStatus.maskedKeys?.elevenLabs }}</code>
+          </div>
           <div class="input-group">
             <input 
               type="password" 
@@ -93,6 +101,12 @@ import { RouterModule } from '@angular/router';
             Text-to-speech for reading AI briefings.
             Get keys from <a href="https://inworld.ai/" target="_blank">Inworld Studio</a>.
           </p>
+          <div class="current-key" *ngIf="configStatus.maskedKeys?.inworldApi">
+            <span class="label">API Key:</span>
+            <code>{{ configStatus.maskedKeys?.inworldApi }}</code>
+            <span class="label" style="margin-left: 10px;">Secret:</span>
+            <code>{{ configStatus.maskedKeys?.inworldSecret }}</code>
+          </div>
           <div class="input-group">
             <input 
               type="password" 
@@ -156,6 +170,14 @@ import { RouterModule } from '@angular/router';
           <p class="description">
             API keys for the AI trading bot. Get keys from <a href="https://alpaca.markets/" target="_blank">Alpaca</a>.
           </p>
+          <div class="current-key" *ngIf="configStatus.maskedKeys?.alpacaKeyId">
+            <span class="label">Key ID:</span>
+            <code>{{ configStatus.maskedKeys?.alpacaKeyId }}</code>
+            <span class="label" style="margin-left: 10px;">Secret:</span>
+            <code>{{ configStatus.maskedKeys?.alpacaSecret || '****' }}</code>
+            <span class="label" style="margin-left: 10px;" *ngIf="configStatus.maskedKeys?.openai">OpenAI:</span>
+            <code *ngIf="configStatus.maskedKeys?.openai">{{ configStatus.maskedKeys?.openai }}</code>
+          </div>
           <div class="input-group">
             <input 
               type="password" 
@@ -228,6 +250,9 @@ import { RouterModule } from '@angular/router';
     
     .show-btn { background: black; border: 1px solid var(--text-secondary); color: var(--text-primary); cursor: pointer; padding: 0 10px; }
     .key-display { border: 1px dashed var(--text-secondary); padding: 5px; color: var(--text-secondary); font-size: 0.8rem; margin-top: 5px; word-break: break-all; }
+    .current-key { background: rgba(0, 255, 136, 0.1); border: 1px solid var(--text-primary); padding: 5px 8px; margin-bottom: 10px; font-size: 0.75rem; display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+    .current-key .label { color: var(--text-secondary); }
+    .current-key code { color: var(--text-primary); font-weight: bold; }
 
     .actions { display: flex; gap: 10px; margin-top: 20px; }
     .save-btn { flex: 1; background: var(--text-primary); color: black; border: 1px solid var(--text-primary); padding: 10px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
@@ -258,14 +283,30 @@ export class AdminSettingsComponent implements OnInit {
   showElevenLabs = false;
   saving = false;
 
-  configStatus = {
-    hasGemini: false,
-    hasElevenLabs: false,
-    hasInworld: false,
-    hasAlpaca: false,
-    hasOpenAI: false,
-    servicesInitialized: false
-  };
+  configStatus: {
+    hasGemini: boolean;
+    hasElevenLabs: boolean;
+    hasInworld: boolean;
+    hasAlpaca: boolean;
+    hasOpenAI: boolean;
+    servicesInitialized: boolean;
+    maskedKeys?: {
+      gemini?: string;
+      elevenLabs?: string;
+      inworldApi?: string;
+      inworldSecret?: string;
+      alpacaKeyId?: string;
+      alpacaSecret?: string;
+      openai?: string;
+    };
+  } = {
+      hasGemini: false,
+      hasElevenLabs: false,
+      hasInworld: false,
+      hasAlpaca: false,
+      hasOpenAI: false,
+      servicesInitialized: false
+    };
 
   constructor(private http: HttpClient) { }
 

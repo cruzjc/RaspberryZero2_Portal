@@ -1,5 +1,7 @@
 // Moved import to avoid Angular dependency
 import express from 'express';
+import crypto from 'crypto';
+// ... existing code ...
 import OpenAI from 'openai';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +12,43 @@ import { NewsService } from './news.js';
 
 const serverDistFolder = dirname(fileURLToPath(import.meta.url));
 const browserDistFolder = resolve(serverDistFolder, '../browser');
+
+// Helper for Inworld Signature
+function generateInworldSignature(apiKey: string, apiSecret: string, host: string, path: string) {
+    const now = new Date();
+    // YYYYMMDDHHMM
+    const date = now.toISOString().split('T')[0].replace(/-/g, '');
+    const time = now.toISOString().split('T')[1].replace(/:/g, '').substring(0, 4); // HHMM? SDK said substring(0,6) HHMMSS? 
+    // SDK: substring(0, 6) which is HHMMSS? 
+    // SDK code: const time = parts[1].replace(/:/g, '').substring(0, 6); -> HHMMSS
+    const datetime = `${date}${now.toISOString().split('T')[1].replace(/:/g, '').substring(0, 6)}`;
+
+    const nonce = crypto.randomBytes(8).toString('hex'); // 8 bytes = 16 hex chars (SDK uses slice(1, 12)? 11 chars? SDK: crypto.randomBytes(16).toString('hex').slice(1, 12))
+    // Let's mimic SDK exactly:
+    const sdkNonce = crypto.randomBytes(16).toString('hex').slice(1, 12);
+
+    let signature: string | Buffer = `IW1${apiSecret}`;
+
+    const params = [
+        datetime,
+        host.replace(':443', ''),
+        path,
+        sdkNonce
+    ];
+
+    for (const p of params) {
+        // HmacSHA256(p, signature). p is data. signature is key.
+        // Node: createHmac(algo, key).update(data)
+        signature = crypto.createHmac('sha256', signature).update(p, 'utf8').digest();
+    }
+
+    // Final signature: HmacSHA256('iw1_request', signature)
+    const finalSig = crypto.createHmac('sha256', signature).update('iw1_request', 'utf8').digest('hex');
+
+    return `IW1-HMAC-SHA256 ApiKey=${apiKey},DateTime=${datetime},Nonce=${sdkNonce},Signature=${finalSig}`;
+}
+
+
 
 const app = express();
 
@@ -27,11 +66,80 @@ interface AppConfig {
     inworldVoices?: string;  // Legacy - comma separated
     inworldVoicePersonalities?: VoicePersonality[];
     categoryPriorities?: string[];
-    // Alpaca Trading Bot keys
+    // Trading
     alpacaKeyId?: string;
     alpacaSecretKey?: string;
-    openaiApiKey?: string;  // For trader (separate from Gemini)
+    openaiApiKey?: string;
+    // Inworld
+    inworldScene?: string; // Format: workspaces/{workspace}/scenes/{scene} (or chars)
 }
+
+// ... existing code ...
+
+app.post('/api/chat/inworld', async (req, res) => {
+    // ... existing chat code ...
+});
+
+app.get('/api/voice/session', async (req, res) => {
+    if (!appConfig.inworldApiKey || !appConfig.inworldSecret) {
+        res.status(503).json({ error: 'Inworld API keys not configured' });
+        return;
+    }
+
+    let personaName = 'ARIA';
+    if (appConfig.inworldVoicePersonalities && appConfig.inworldVoicePersonalities.length > 0) {
+        personaName = appConfig.inworldVoicePersonalities[0].name;
+    }
+
+    try {
+        const host = 'api.inworld.ai';
+        // Generic gRPC path for GenerateToken
+        const path = '/ai.inworld.engine.WorldEngine/GenerateToken';
+        // SDK strips leading slash for method in signature?
+        const methodInSig = 'ai.inworld.engine.WorldEngine/GenerateToken';
+
+        const authHeader = generateInworldSignature(
+            appConfig.inworldApiKey,
+            appConfig.inworldSecret,
+            host,
+            methodInSig
+        );
+
+        const response = await fetch(`https://${host}${path}`, {
+            method: 'POST',
+            headers: {
+                'Authorization': authHeader,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                key: appConfig.inworldApiKey,
+                resources: appConfig.inworldScene ? [appConfig.inworldScene] : []
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.text();
+            console.error('Inworld token error:', err);
+            res.status(response.status).json({ error: `Inworld error: ${response.status} ${err}` });
+            return;
+        }
+
+        const data = await response.json() as any;
+        res.json({
+            wsUrl: 'wss://api.inworld.ai/v1/session',
+            sessionId: data.sessionId,
+            accessToken: data.token,
+            persona: personaName,
+            configured: true,
+            scene: appConfig.inworldScene
+        });
+
+    } catch (err: any) {
+        console.error('Voice session error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 const resourcesFile = join(os.homedir(), '.portal-resources.json');
 const configFile = join(os.homedir(), '.portal-config.json');
@@ -136,6 +244,12 @@ app.get('/session', async (req, res) => {
     }
 });
 
+// Helper to mask API keys for display (first 4 + last 4 chars)
+function maskKey(key?: string): string | undefined {
+    if (!key || key.length < 12) return key ? '****' : undefined;
+    return `${key.slice(0, 4)}...${key.slice(-4)}`;
+}
+
 // API Configuration Endpoints
 app.get('/api/config', (req, res) => {
     res.json({
@@ -144,7 +258,17 @@ app.get('/api/config', (req, res) => {
         hasInworld: !!appConfig.inworldApiKey && !!appConfig.inworldSecret,
         hasAlpaca: !!appConfig.alpacaKeyId && !!appConfig.alpacaSecretKey,
         hasOpenAI: !!appConfig.openaiApiKey,
-        servicesInitialized: !!newsService
+        servicesInitialized: !!newsService,
+        // Masked key previews for comparison
+        maskedKeys: {
+            gemini: maskKey(appConfig.geminiApiKey),
+            elevenLabs: maskKey(appConfig.elevenLabsApiKey),
+            inworldApi: maskKey(appConfig.inworldApiKey),
+            inworldSecret: maskKey(appConfig.inworldSecret),
+            alpacaKeyId: maskKey(appConfig.alpacaKeyId),
+            alpacaSecret: maskKey(appConfig.alpacaSecretKey),
+            openai: maskKey(appConfig.openaiApiKey)
+        }
     });
 });
 

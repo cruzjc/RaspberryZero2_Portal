@@ -26,11 +26,17 @@
         [ SERVICES ]
       </button>
       <div class="nav-spacer"></div>
-      <button class="term-btn danger" (click)="endCall()" *ngIf="sessionActive">
-        [ TERMINATE_LINK ]
+      <button class="term-btn danger" (click)="endCall()" *ngIf="chatOpen">
+        [ END_CHAT ]
       </button>
-      <button class="term-btn primary" (click)="startCall()" *ngIf="!sessionActive">
+      <button class="term-btn danger" (click)="endVoice()" *ngIf="voiceActive">
+        [ END_VOICE ]
+      </button>
+      <button class="term-btn primary" (click)="startCall()" *ngIf="!chatOpen && !voiceActive">
         [ ESTABLISH_LINK ]
+      </button>
+      <button class="term-btn voice" (click)="startVoice()" *ngIf="!chatOpen && !voiceActive">
+        [ VOICE_LINK ]
       </button>
     </nav>
 
@@ -125,4 +131,7 @@
 
   <!-- Chat Assistant Modal -->
   <app-chat-assistant *ngIf="chatOpen" (close)="endCall()"></app-chat-assistant>
+
+  <!-- Voice Chat Modal -->
+  <app-voice-chat *ngIf="voiceActive" (close)="endVoice()"></app-voice-chat>
 </div>

@@ -171,12 +171,22 @@ function saveConfig(config: AppConfig) {
 
 // Initialize config from env or file
 let appConfig = readConfig();
-if (process.env['GEMINI_API_KEY'] && !appConfig.geminiApiKey) {
-    appConfig.geminiApiKey = process.env['GEMINI_API_KEY'];
+
+// Helper to load from env if present - environment variables take precedence
+function syncEnv(key: keyof AppConfig, envVar: string) {
+    if (process.env[envVar]) {
+        (appConfig as any)[key] = process.env[envVar];
+    }
 }
-if (process.env['ELEVENLABS_API_KEY'] && !appConfig.elevenLabsApiKey) {
-    appConfig.elevenLabsApiKey = process.env['ELEVENLABS_API_KEY'];
-}
+
+syncEnv('geminiApiKey', 'GEMINI_API_KEY');
+syncEnv('elevenLabsApiKey', 'ELEVENLABS_API_KEY');
+syncEnv('inworldApiKey', 'INWORLD_API_KEY');
+syncEnv('inworldSecret', 'INWORLD_SECRET');
+syncEnv('inworldScene', 'INWORLD_SCENE');
+syncEnv('alpacaKeyId', 'ALPACA_API_KEY_ID');
+syncEnv('alpacaSecretKey', 'ALPACA_API_SECRET_KEY');
+syncEnv('openaiApiKey', 'OPENAI_API_KEY');
 
 // Lazy initialization - only create when keys available
 let newsService: NewsService | null = null;

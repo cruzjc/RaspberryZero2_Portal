@@ -32,7 +32,9 @@
             "scripts": [],
             "server": "src/main.server.ts",
             "prerender": false,
-            "ssr": false
+            "ssr": {
+              "entry": "src/server.ts"
+            }
           },
           "configurations": {
             "production": {

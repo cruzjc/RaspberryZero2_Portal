@@ -601,15 +601,21 @@ const contingentOrdersFile = join(os.homedir(), 'projects/trader/contingent_orde
 async function alpacaRequest(endpoint: string, method = 'GET', body?: any): Promise<any> {
     // Read API keys from trader config
     if (!existsSync(traderEnvFile)) {
-        throw new Error('Trading not configured');
+        throw new Error(`Trader config file not found: ${traderEnvFile}`);
     }
 
     const envContent = readFileSync(traderEnvFile, 'utf8');
+    console.log(`[Trading] Config file size: ${envContent.length} bytes, lines: ${envContent.split('\n').length}`);
+
     const keyMatch = envContent.match(/ALPACA_API_KEY_ID=(.+)/);
     const secretMatch = envContent.match(/ALPACA_API_SECRET_KEY=(.+)/);
 
     if (!keyMatch || !secretMatch) {
-        throw new Error('Alpaca keys not found');
+        const missing = [];
+        if (!keyMatch) missing.push('ALPACA_API_KEY_ID');
+        if (!secretMatch) missing.push('ALPACA_API_SECRET_KEY');
+        console.log(`[Trading] File content preview: ${envContent.substring(0, 200)}`);
+        throw new Error(`Missing Alpaca keys: ${missing.join(', ')}`);
     }
 
     const isPaper = true; // Always use paper for safety

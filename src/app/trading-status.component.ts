@@ -146,11 +146,9 @@ export class TradingStatusComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.loading = false;
-        if (err.status === 503) {
-          this.error = 'Trading not configured';
-        } else {
-          this.error = 'Failed to load status';
-        }
+        // Show actual error message from server
+        this.error = err.error?.error || err.error?.message ||
+          (err.status === 503 ? 'Trading not configured' : 'Failed to load status');
       }
     });
   }

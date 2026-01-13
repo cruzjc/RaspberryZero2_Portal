@@ -618,7 +618,8 @@ async function alpacaRequest(endpoint: string, method = 'GET', body?: any): Prom
         throw new Error(`Missing Alpaca keys: ${missing.join(', ')}`);
     }
 
-    const isPaper = true; // Always use paper for safety
+    // Use live trading API (set to true for paper trading keys)
+    const isPaper = false;
     const baseUrl = isPaper ? 'https://paper-api.alpaca.markets' : 'https://api.alpaca.markets';
 
     const response = await fetch(`${baseUrl}${endpoint}`, {

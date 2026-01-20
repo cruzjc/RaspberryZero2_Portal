@@ -594,6 +594,75 @@ Answer user questions helpfully while staying in character. Keep responses conci
     }
 });
 
+// --- Inworld TTS API for Voice Chat ---
+app.post('/api/tts', async (req, res) => {
+    const { text } = req.body as { text: string };
+
+    if (!text) {
+        res.status(400).json({ error: 'Text is required' });
+        return;
+    }
+
+    if (!appConfig.inworldApiKey || !appConfig.inworldSecret) {
+        res.status(503).json({ error: 'Inworld TTS not configured. Add keys in Settings.' });
+        return;
+    }
+
+    try {
+        const url = 'https://api.inworld.ai/tts/v1/voice';
+        const credentials = Buffer.from(`${appConfig.inworldApiKey}:${appConfig.inworldSecret}`).toString('base64');
+
+        // Select voice from personality config
+        let selectedVoice = 'Ashley';
+        if (appConfig.inworldVoicePersonalities && appConfig.inworldVoicePersonalities.length > 0) {
+            selectedVoice = appConfig.inworldVoicePersonalities[0].voiceId || 'Ashley';
+        } else if (appConfig.inworldVoices) {
+            const voices = appConfig.inworldVoices.split(',').map(v => v.trim()).filter(v => v);
+            if (voices.length > 0) selectedVoice = voices[0];
+        }
+
+        console.log(`TTS generating with voice: ${selectedVoice}`);
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Basic ${credentials}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                text: text.substring(0, 2000), // Limit text length
+                voiceId: selectedVoice,
+                modelId: 'inworld-tts-1'
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Inworld TTS error:', response.status, errorText);
+            res.status(response.status).json({ error: `TTS error: ${response.status}` });
+            return;
+        }
+
+        const result = await response.json() as { audioContent?: string };
+
+        if (!result.audioContent) {
+            res.status(500).json({ error: 'No audio content in response' });
+            return;
+        }
+
+        // Return base64 audio directly for client-side playback
+        res.json({
+            audio: result.audioContent,
+            format: 'mp3',
+            voice: selectedVoice
+        });
+
+    } catch (err: any) {
+        console.error('TTS error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // --- Trading API ---
 const contingentOrdersFile = join(os.homedir(), 'projects/trader/contingent_orders.json');
 

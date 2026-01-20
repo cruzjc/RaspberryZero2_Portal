@@ -183,6 +183,7 @@ export class VoiceChatComponent implements OnInit, OnDestroy {
   transcript: { speaker: 'user' | 'ai'; text: string }[] = [];
   waveformBars: number[] = new Array(20).fill(5);
   speechSupported = false;
+  hasInworldTTS = false;
 
   private mediaStream?: MediaStream;
   private audioContext?: AudioContext;
@@ -190,6 +191,7 @@ export class VoiceChatComponent implements OnInit, OnDestroy {
   private animationFrame?: number;
   private recognition?: any;
   private conversationHistory: { role: string; content: string }[] = [];
+  private audioElement?: HTMLAudioElement;
 
   constructor(private http: HttpClient) { }
 
@@ -222,6 +224,21 @@ export class VoiceChatComponent implements OnInit, OnDestroy {
       if (!config.hasGemini) {
         this.error = 'Gemini API not configured. Add key in Settings.';
         return;
+      }
+
+      // Enable Inworld TTS if configured
+      this.hasInworldTTS = config.hasInworld;
+
+      // Get persona name from voice session endpoint
+      if (this.hasInworldTTS) {
+        try {
+          const sessionInfo = await this.http.get<any>('/api/voice/session').toPromise();
+          if (sessionInfo?.persona) {
+            this.personaName = sessionInfo.persona;
+          }
+        } catch (e) {
+          console.warn('Could not get voice session info:', e);
+        }
       }
 
       // Check if mediaDevices is supported
@@ -380,17 +397,51 @@ export class VoiceChatComponent implements OnInit, OnDestroy {
     }, 50);
   }
 
-  private speakText(text: string) {
-    if ('speechSynthesis' in window) {
-      // Stop listening while speaking to avoid feedback
-      this.stopListening();
-      this.isSpeaking = true;
+  private async speakText(text: string) {
+    // Stop listening while speaking to avoid feedback
+    this.stopListening();
+    this.isSpeaking = true;
 
+    // Try Inworld TTS first for high-quality character voice
+    if (this.hasInworldTTS) {
+      try {
+        const response = await this.http.post<any>('/api/tts', { text }).toPromise();
+        if (response?.audio) {
+          // Play base64 audio
+          const audioSrc = `data:audio/mp3;base64,${response.audio}`;
+          this.audioElement = new Audio(audioSrc);
+
+          this.audioElement.onended = () => {
+            this.isSpeaking = false;
+            if (this.connected) {
+              this.startListening();
+            }
+          };
+
+          this.audioElement.onerror = () => {
+            console.error('Audio playback error, falling back to Web Speech');
+            this.isSpeaking = false;
+            this.speakWithWebSpeech(text);
+          };
+
+          this.audioElement.play();
+          return;
+        }
+      } catch (err) {
+        console.warn('Inworld TTS failed, falling back to Web Speech:', err);
+      }
+    }
+
+    // Fallback to Web Speech API
+    this.speakWithWebSpeech(text);
+  }
+
+  private speakWithWebSpeech(text: string) {
+    if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 1.0;
       utterance.pitch = 1.0;
 
-      // Try to find a good voice
       const voices = speechSynthesis.getVoices();
       const preferredVoice = voices.find(v =>
         v.lang.startsWith('en') && (v.name.includes('Female') || v.name.includes('Google'))
@@ -414,6 +465,11 @@ export class VoiceChatComponent implements OnInit, OnDestroy {
       };
 
       speechSynthesis.speak(utterance);
+    } else {
+      this.isSpeaking = false;
+      if (this.connected) {
+        this.startListening();
+      }
     }
   }
 
@@ -461,6 +517,11 @@ export class VoiceChatComponent implements OnInit, OnDestroy {
 
   private cleanup() {
     this.stopListening();
+    // Stop Inworld TTS audio if playing
+    if (this.audioElement) {
+      this.audioElement.pause();
+      this.audioElement = undefined;
+    }
     if (typeof speechSynthesis !== 'undefined' && speechSynthesis.speaking) {
       speechSynthesis.cancel();
     }
